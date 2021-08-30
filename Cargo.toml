@@ -1,0 +1,11 @@
+[package]
+name = "load_tool"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+argh = "0.1.5"
+humantime = "2.1.0"
+hyper = { version = "0.14.12", features = ["full"] }
+hyper-tls = "0.5.0"
+tokio = { version = "1.10.1", features = ["full"] }
