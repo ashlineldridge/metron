@@ -1,11 +1,12 @@
 [package]
-name = "load_tool"
+name = "wrk3"
 version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-argh = "0.1.5"
+argh = "0.1.6"
 humantime = "2.1.0"
-hyper = { version = "0.14.12", features = ["full"] }
+hyper = { version = "0.14.13", features = ["full"] }
 hyper-tls = "0.5.0"
-tokio = { version = "1.10.1", features = ["full"] }
+tokio = { version = "1.12.0", features = ["full"] }
+num-bigint = "0.4.2" # Force latest version of transitive dependency due to bug https://githubmemory.com/repo/rust-num/num-bigint/issues/218
