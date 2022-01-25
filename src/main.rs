@@ -1,9 +1,16 @@
 use argh::FromArgs;
-use hyper::Client;
+use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 
-#[derive(FromArgs, Debug)]
 /// Your new favorite performance characterization tool.
+///
+/// # Examples
+/// ```
+/// let cli: Cli = argh::from_env();
+///
+/// assert_eq!(cli.connections, 10);
+/// ```
+#[derive(FromArgs, Debug)]
 struct Cli {
     /// connections to keep open (defaults to 10)
     #[argh(option, short = 'c', default = "10")]
@@ -35,7 +42,7 @@ struct Cli {
 
     /// target URL
     #[argh(positional)]
-    target: Option<String>,
+    target: Option<Uri>,
 }
 
 #[tokio::main]
@@ -50,11 +57,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     match cli.target {
         Some(target) => {
-            let uri = target.parse()?;
             let https = HttpsConnector::new();
             let client = Client::builder().build::<_, hyper::Body>(https);
             // let client = Client::new();
-            let resp = client.get(uri).await?;
+            let resp = client.get(target).await?;
 
             println!("Response status: {}", resp.status());
 
