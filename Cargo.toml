@@ -1,10 +1,13 @@
 [package]
 name = "wrkr"
-version = "0.1.0"
+authors = ["Ashlin Eldridge"]
+description = "Performance characterization tool"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-argh = "0.1.7"
+anyhow = "1.0.53"
+clap = { version = "3.0.13", features = ["derive"] }
 humantime = "2.1.0"
 hyper = { version = "0.14.16", features = ["full"] }
 hyper-tls = "0.5.0"
