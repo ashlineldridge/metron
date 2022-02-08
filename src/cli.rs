@@ -56,19 +56,6 @@ pub struct TestCli {
     pub target: Uri,
 }
 
-impl From<TestCli> for TestConfig {
-    fn from(cli: TestCli) -> Self {
-        Self {
-            connections: cli.connections,
-            threads: cli.threads,
-            rate: cli.rate,
-            duration: cli.duration,
-            headers: cli.header,
-            target: cli.target,
-        }
-    }
-}
-
 #[derive(Debug, Parser)]
 pub struct ServeCli {
     /// Port to listen on
@@ -78,6 +65,19 @@ pub struct ServeCli {
     /// Number of threads
     #[clap(short, long, value_name = "COUNT", default_value_t = 4)]
     pub threads: usize,
+}
+
+impl From<TestCli> for TestConfig {
+    fn from(cli: TestCli) -> Self {
+        Self {
+            connections: cli.connections,
+            threads: cli.threads,
+            rate: cli.rate,
+            duration: cli.duration.into(),
+            headers: cli.header,
+            target: cli.target,
+        }
+    }
 }
 
 impl From<ServeCli> for ServeConfig {

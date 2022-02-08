@@ -12,7 +12,10 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse_args();
     match cli.command {
-        Test(cli) => test(&cli.into())?,
+        Test(cli) => {
+            let res = test(&cli.into())?;
+            println!("{:?}", res);
+        }
         Serve(cli) => serve(&cli.into())?,
     };
 
