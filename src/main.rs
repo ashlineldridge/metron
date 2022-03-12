@@ -4,7 +4,9 @@ use serve::serve;
 use test::test;
 
 mod cli;
+mod schedule;
 mod serve;
+mod signal;
 mod test;
 
 fn main() -> Result<()> {

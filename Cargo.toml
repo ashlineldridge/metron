@@ -6,7 +6,7 @@ version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.53"
+anyhow = "1.0.56"
 clap = { version = "3.0.13", features = ["derive"] }
 humantime = "2.1.0"
 hyper = { version = "0.14.16", features = ["full"] }

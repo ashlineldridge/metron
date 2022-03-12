@@ -32,8 +32,8 @@ pub enum Command {
 
 #[derive(Debug, Parser)]
 pub struct TestCli {
-    /// Number of connections to keep open
-    #[clap(short, long, value_name = "COUNT", default_value_t = 10)]
+    /// Number of connections to use
+    #[clap(short, long, value_name = "COUNT", default_value_t = 1)]
     pub connections: usize,
 
     /// Number of threads
