@@ -2,6 +2,7 @@ use crate::{
     serve::ServeConfig,
     test::{Header, TestConfig},
 };
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use hyper::Uri;
@@ -40,13 +41,21 @@ pub struct TestCli {
     #[clap(short, long, value_name = "COUNT", default_value_t = 4)]
     pub threads: usize,
 
-    /// Requests per second (0 for max)
-    #[clap(short, long, default_value_t = 0)]
-    pub rate: usize,
+    /// Requests per second
+    #[clap(short, long)]
+    pub rate: Option<u32>,
 
-    /// Execution duration (0s for forever)
-    #[clap(short, long, default_value = "0s")]
-    pub duration: humantime::Duration,
+    /// Execution duration
+    #[clap(short, long)]
+    pub duration: Option<humantime::Duration>,
+
+    /// Initial requests per second for ramped throughput
+    #[clap(short, long)]
+    pub init_rate: Option<u32>,
+
+    /// Duration over which to ramp up throughput
+    #[clap(short, long)]
+    pub ramp_duration: Option<humantime::Duration>,
 
     /// Header to pass in request (may be repeated)
     #[clap(short = 'H', long, value_name = "NAME:VALUE")]
@@ -71,9 +80,11 @@ impl From<TestCli> for TestConfig {
     fn from(cli: TestCli) -> Self {
         Self {
             connections: cli.connections,
-            threads: cli.threads,
+            worker_threads: cli.threads,
             rate: cli.rate,
-            duration: cli.duration.into(),
+            duration: cli.duration.map(|d| d.into()),
+            init_rate: cli.init_rate,
+            ramp_duration: cli.ramp_duration.map(|d| d.into()),
             headers: cli.header,
             target: cli.target,
         }

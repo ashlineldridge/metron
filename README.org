@@ -1,3 +1,6 @@
 * wrkr
 
 An homage to Will Glozer's [[https://github.com/wg/wrk][wrk]] and Gil Tene's [[https://github.com/giltene/wrk2][wrk2]], wrkr is performance characterization tool written in Rust.
+
+** TODOs
+*** Read up on clap.rs and implement proper CLI validation (e.g., if this then that)

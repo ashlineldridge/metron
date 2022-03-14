@@ -1,10 +1,35 @@
 use crate::schedule::RequestSchedule;
 
 use anyhow::Error;
-use std::time::Instant;
-use tokio::{sync::mpsc::Sender, task::JoinHandle};
+use std::{future::Future, time::Instant};
+use tokio::{
+    sync::mpsc::{Receiver, Sender},
+    task::JoinHandle,
+};
 
-pub struct SignalGenerator {
+// ADT for building and combining signallers
+// Run them in parallel
+// Run them sequentially
+// Build a ramp + fixed rate + max rate (for example)
+
+struct Signaller<T: Schedule> {
+    schedule: T,
+}
+
+impl Signaller {
+    fn start(&self) -> JoinHandle<Result<(), Error>> {
+        todo!();
+    }
+
+    async fn recv(&mut self) -> Option<Signal> {
+        todo!();
+    }
+}
+
+// TODO: Consider creating BlockingSignalGenerator and AsyncSignalGenerator and
+// making them extend a common SignalGenerator trait with a run method. Perhaps
+// the run method should take the tx?
+pub struct BlockingSignalGenerator {
     tx: Sender<Signal>,
 }
 
@@ -13,7 +38,7 @@ pub struct Signal {
     pub due: Instant,
 }
 
-impl SignalGenerator {
+impl BlockingSignalGenerator {
     fn new(tx: Sender<Signal>) -> Self {
         Self { tx }
     }
