@@ -1,161 +1,169 @@
 use std::time::{Duration, Instant};
 
-trait Schedule {
-    fn next(&mut self) -> Option<Duration>;
+use wrkr::Rate;
+
+#[allow(dead_code)]
+pub fn asap() -> AsapSchedule {
+    AsapSchedule::new()
 }
 
-struct AsapSchedule {}
+pub fn fixed_rate(rate: Rate) -> FixedRateSchedule {
+    FixedRateSchedule::new(Duration::from_secs(1) / rate)
+}
+
+pub fn ramped_rate(from: Rate, to: Rate, over: Duration) -> RampedRateSchedule {
+    let from = Duration::from_secs(1) / from;
+    let to = Duration::from_secs(1) / to;
+    RampedRateSchedule::new(from, to, over)
+}
+
+pub fn finite<S: Schedule>(duration: Duration, inner: S) -> FiniteDurationSchedule<S> {
+    FiniteDurationSchedule::new(duration, inner)
+}
+
+pub trait Schedule: Send {
+    fn next(&mut self) -> Option<Duration>;
+
+    fn iter_from(self, start: Instant) -> ScheduleIter<Self>
+    where
+        Self: Sized,
+    {
+        ScheduleIter {
+            schedule: self,
+            start,
+        }
+    }
+
+    fn boxed<'a>(self) -> Box<dyn Schedule + 'a>
+    where
+        Self: Sized + 'a,
+    {
+        Box::new(self) as Box<dyn Schedule>
+    }
+}
+
+pub struct ScheduleIter<S: Schedule> {
+    schedule: S,
+    start: Instant,
+}
+
+impl<S: Schedule> Iterator for ScheduleIter<S> {
+    type Item = Instant;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.schedule.next().map(|n| self.start + n)
+    }
+}
+
+impl Schedule for Box<dyn Schedule> {
+    fn next(&mut self) -> Option<Duration> {
+        self.as_mut().next()
+    }
+}
+
+pub struct AsapSchedule {
+    start: Option<Instant>,
+}
 
 impl AsapSchedule {
+    #[allow(dead_code)]
     fn new() -> Self {
-        Self {}
+        Self { start: None }
     }
 }
 
 impl Schedule for AsapSchedule {
     fn next(&mut self) -> Option<Duration> {
-        Some(Duration::from_secs(0))
+        let start = self.start.expect("AsapSchedule expected start value");
+        Some(Instant::now() - start)
+    }
+
+    fn iter_from(mut self, start: Instant) -> ScheduleIter<Self> {
+        self.start = Some(start);
+        ScheduleIter {
+            schedule: self,
+            start,
+        }
     }
 }
 
-struct FixedIntervalSchedule {
-    previous: Option<Duration>,
+pub struct FixedRateSchedule {
+    prev: Option<Duration>,
     interval: Duration,
 }
 
-impl FixedIntervalSchedule {
+impl FixedRateSchedule {
     fn new(interval: Duration) -> Self {
         Self {
-            previous: None,
+            prev: None,
             interval,
         }
     }
 }
 
-impl Schedule for FixedIntervalSchedule {
+impl Schedule for FixedRateSchedule {
     fn next(&mut self) -> Option<Duration> {
-        self.previous = self
-            .previous
-            .map(|p| p + self.interval)
-            .or_else(|| Some(Duration::from_secs(0)));
-        self.previous
+        let next = if let Some(prev) = self.prev {
+            Some(prev + self.interval)
+        } else {
+            Some(Duration::from_secs(0))
+        };
+
+        self.prev = next;
+        next
     }
 }
 
-struct FiniteDurationSchedule<T: Schedule> {
-    previous: Option<Duration>,
-    limit: Duration,
-    inner: T,
+pub struct FiniteDurationSchedule<S: Schedule> {
+    duration: Duration,
+    inner: S,
 }
 
-impl<T: Schedule> FiniteDurationSchedule<T> {
-    fn new(limit: Duration, inner: T) -> Self {
+impl<S: Schedule> FiniteDurationSchedule<S> {
+    fn new(duration: Duration, inner: S) -> Self {
+        Self { duration, inner }
+    }
+}
+
+impl<S: Schedule> Schedule for FiniteDurationSchedule<S> {
+    fn next(&mut self) -> Option<Duration> {
+        self.inner
+            .next()
+            .and_then(|n| if n < self.duration { Some(n) } else { None })
+    }
+}
+
+pub struct RampedRateSchedule {
+    progress: Duration,
+    ramp_from_interval: Duration,
+    ramp_to_interval: Duration,
+    ramp_duration: Duration,
+}
+
+impl RampedRateSchedule {
+    pub fn new(
+        ramp_from_interval: Duration,
+        ramp_to_interval: Duration,
+        ramp_duration: Duration,
+    ) -> Self {
         Self {
-            previous: None,
-            limit,
-            inner,
+            progress: Duration::from_secs(0),
+            ramp_from_interval,
+            ramp_to_interval,
+            ramp_duration,
         }
     }
 }
 
-impl<T: Schedule> Schedule for FiniteDurationSchedule<T> {
+impl Schedule for RampedRateSchedule {
     fn next(&mut self) -> Option<Duration> {
-        todo!()
+        let next = self.ramp_from_interval
+            - Duration::from_secs_f32(
+                (self.ramp_from_interval - self.ramp_to_interval).as_secs_f32()
+                    * (self.progress.as_secs_f32() / self.ramp_duration.as_secs_f32()).min(1.0),
+            );
+
+        self.progress += next;
+        Some(next)
     }
 }
-
-// struct FixedIntervalSchedule {
-//     last: Duration,
-//     interval: Duration,
-//     duration: Duration,
-// }
-
-// #[derive(Clone)]
-// pub struct RequestSchedule {
-//     pub start: Instant,
-// }
-
-// pub struct FixedIntervalSchedule {
-//     index: u32,
-//     start: Instant,
-//     interval: Duration,
-//     duration: Duration,
-// }
-
-// impl FixedIntervalSchedule {
-//     pub fn new(start: Instant, interval: Duration, duration: Duration) -> Self {
-//         Self {
-//             index: 0,
-//             start,
-//             interval,
-//             duration,
-//         }
-//     }
-// }
-
-// impl Iterator for FixedIntervalSchedule {
-//     type Item = RequestSchedule;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         let offset = self.index * self.interval;
-//         if offset < self.duration {
-//             Some(RequestSchedule {
-//                 start: self.start + offset,
-//             })
-//         } else {
-//             None
-//         }
-//     }
-// }
-
-// pub struct RampedFixedIntervalSchedule {
-//     start: Instant,
-//     previous: Option<Instant>,
-//     init_interval: Duration,
-//     ramp_duration: Duration,
-//     main_interval: Duration,
-//     main_duration: Duration,
-// }
-
-// impl RampedFixedIntervalSchedule {
-//     pub fn new(
-//         start: Instant,
-//         init_interval: Duration,
-//         main_interval: Duration,
-//         ramp_duration: Duration,
-//         main_duration: Duration,
-//     ) -> Self {
-//         Self {
-//             start,
-//             previous: None,
-//             init_interval,
-//             main_interval,
-//             ramp_duration,
-//             main_duration,
-//         }
-//     }
-// }
-
-// impl Iterator for RampedFixedIntervalSchedule {
-//     type Item = RequestSchedule;
-
-//     fn next(&mut self) -> Option<Self::Item> {
-//         if let Some(previous) = self.previous {
-//             let prog = (previous - self.start).as_secs_f32();
-//             let mult = (prog / self.ramp_duration.as_secs_f32()).min(1.0);
-//             let diff = mult * (self.init_interval - self.main_interval).as_secs_f32();
-//             let next = previous + self.init_interval - Duration::from_secs_f32(diff);
-
-//             let end = self.start + self.ramp_duration + self.main_duration;
-//             if next < end {
-//                 self.previous = Some(next);
-//                 Some(RequestSchedule { start: next })
-//             } else {
-//                 None
-//             }
-//         } else {
-//             self.previous = Some(self.start);
-//             Some(RequestSchedule { start: self.start })
-//         }
-//     }
-// }

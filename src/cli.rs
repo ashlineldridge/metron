@@ -54,7 +54,7 @@ pub struct TestCli {
     pub init_rate: Option<u32>,
 
     /// Duration over which to ramp up throughput
-    #[clap(short, long)]
+    #[clap(short = 'R', long)]
     pub ramp_duration: Option<humantime::Duration>,
 
     /// Header to pass in request (may be repeated)
@@ -81,6 +81,7 @@ impl From<TestCli> for TestConfig {
         Self {
             connections: cli.connections,
             worker_threads: cli.threads,
+            async_signaller: false,
             rate: cli.rate,
             duration: cli.duration.map(|d| d.into()),
             init_rate: cli.init_rate,

@@ -5,9 +5,10 @@ use test::run;
 
 mod cli;
 mod client;
+mod error;
 mod schedule;
 mod serve;
-mod signal;
+mod signaller;
 mod test;
 
 fn main() -> Result<()> {
