@@ -5,7 +5,8 @@ use tokio::runtime::Builder;
 
 use wrkr::Rate;
 
-use crate::{client::ClientResult, schedule::Schedule, signaller::Signaller};
+use crate::schedule::Plan;
+use crate::{client::ClientResult, signaller::Signaller};
 
 #[derive(Debug)]
 pub struct TestConfig {

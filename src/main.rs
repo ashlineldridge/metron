@@ -6,10 +6,16 @@ use test::run;
 mod cli;
 mod client;
 mod error;
-mod schedule;
+mod plan;
 mod serve;
 mod signaller;
 mod test;
+mod wait;
+
+/// A is good.
+///
+/// It's what you want.
+pub struct A {}
 
 fn main() -> Result<()> {
     use Command::*;
