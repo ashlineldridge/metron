@@ -5,7 +5,7 @@ use tokio::runtime::Builder;
 
 use wrkr::Rate;
 
-use crate::schedule::Plan;
+use crate::plan::Plan;
 use crate::{client::ClientResult, signaller::Signaller};
 
 #[derive(Debug)]

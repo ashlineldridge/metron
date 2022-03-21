@@ -38,7 +38,7 @@ impl Plan {
     ///
     /// * `start` - When the test was started
     /// * `now` - The current time
-    pub fn when(&self, start: Instant, now: Instant) -> Option<Instant> {
+    pub fn next(&self, start: Instant, now: Instant) -> Option<Instant> {
         assert!(start <= now, "Start value must be less than now");
 
         let progress = now - start;
@@ -69,8 +69,56 @@ impl Plan {
             (_, _, Some(rate)) => now + rate.as_interval(),
         };
     }
+
+    pub fn iter(&self, start: Instant) -> PlanIter {
+        PlanIter {
+            plan: self.clone(),
+            start,
+        }
+    }
 }
 
+pub struct PlanIter {
+    plan: Plan,
+    start: Instant,
+}
+
+impl Iterator for PlanIter {
+    type Item = Instant;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.plan.next(self.start, Instant::now())
+    }
+}
+
+/// Builder used to construct a [Plan].
+///
+/// # Examples
+/// ```
+/// use crate::plan::Builder;
+/// use wrkr::Rate;
+///
+/// // Construct a maximal throughput plan that runs forever.
+/// let plan = Builder::new()
+///   .build()
+///   .unwrap();
+///
+/// // Construct a fixed throughput plan (500 RPS) that runs for 5 minutes.
+/// let plan = Builder::new()
+///   .rate(Rate(500))
+///   .duration(Duration::from_secs(5 * 60))
+///   .build()
+///   .unwrap();
+///
+/// // Construct a plan that ramps up throughput from 10 RPS to 500 RPS over
+/// // the first 60 seconds and then maintains 500 RPS for a further 5 minutes.
+/// let plan = Builder::new()
+///   .ramp(Rate(10), Rate(500), Duration::from_secs(60))
+///   .rate(Rate(500))
+///   .duration(Duration::from_secs(5 * 60))
+///   .build()
+///   .unwrap();
+/// ```
 pub struct Builder {
     /// The plan under construction.
     plan: Plan,
