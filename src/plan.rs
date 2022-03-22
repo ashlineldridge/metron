@@ -15,6 +15,10 @@ pub struct Plan {
     duration: Option<Duration>,
     /// Optional rate (none implies maximal rate).
     rate: Option<Rate>,
+    /// When the plan was started (none if not started).
+    start: Option<Instant>,
+    /// Previously returned instant (none if not started).
+    prev: Option<Instant>,
 }
 
 /// Ramp specs used to vary the initial rate of the `Plan`.
@@ -28,66 +32,56 @@ struct Ramp {
     /// Rate that the ramp finishes at.
     to: Rate,
     /// Time period over which to vary the rate.
-    over: Duration,
+    duration: Duration,
 }
 
 impl Plan {
-    /// Returns when the next request should be sent.
-    ///
-    /// # Arguments
-    ///
-    /// * `start` - When the test was started
-    /// * `now` - The current time
-    pub fn next(&self, start: Instant, now: Instant) -> Option<Instant> {
-        assert!(start <= now, "Start value must be less than now");
-
-        let progress = now - start;
-        match (self.ramp, self.duration, self.rate) {
-            // Are we finished?
-            (_, Some(duration), _) if progress >= duration => None,
-
-            // Are we ramping the rate up?
-            (Some(ramp), _, _) if progress < ramp.over => {
-                let delta = Duration::from_secs_f32(
-                    (ramp.from.as_interval() - ramp.to.as_interval())
-                        .as_secs_f32()
-                        .abs()
-                        * (progress.as_secs_f32() / ramp.duration.as_secs_f32()).min(1.0),
-                );
-
-                if ramp.from < ramp.to {
-                    now + ramp.from.as_interval() - delta;
-                } else {
-                    now + ramp.from.as_interval() + delta
-                }
-            }
-
-            // Are we going full tilt?
-            (_, _, None) => now,
-
-            // We must be doing a fixed-rate test.
-            (_, _, Some(rate)) => now + rate.as_interval(),
-        };
-    }
-
-    pub fn iter(&self, start: Instant) -> PlanIter {
-        PlanIter {
-            plan: self.clone(),
-            start,
-        }
+    /// Resets the plan back to an unstarted state.
+    pub fn reset(&mut self) {
+        self.start = None;
+        self.prev = None;
     }
 }
 
-pub struct PlanIter {
-    plan: Plan,
-    start: Instant,
-}
-
-impl Iterator for PlanIter {
+impl Iterator for Plan {
     type Item = Instant;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.plan.next(self.start, Instant::now())
+        // When did the plan start?
+        let start = *self.start.get_or_insert(Instant::now());
+
+        // How far into the plan are we?
+        let progress = self.prev.unwrap_or(start) - start;
+
+        // Calculate the next instant that a request should be sent.
+        let next = match (&self.ramp, &self.rate) {
+            // Are we ramping the rate up?
+            (Some(ramp), _) if progress < ramp.duration => {
+                let ramp_from = ramp.from.as_interval().as_secs_f32();
+                let ramp_to = ramp.to.as_interval().as_secs_f32();
+                let progress = progress.as_secs_f32();
+                let ramp_duration = ramp.duration.as_secs_f32();
+
+                let ramp_progress_factor =
+                    (ramp_from - ramp_to) * (progress / ramp_duration).min(1.0);
+                let delta = Duration::from_secs_f32(ramp_from - ramp_progress_factor);
+
+                self.prev.map(|t| t + delta).unwrap_or(start)
+            }
+
+            // We must be doing a fixed-rate test.
+            (_, Some(rate)) => self.prev.map(|t| t + rate.as_interval()).unwrap_or(start),
+
+            // Are we going full tilt?
+            (_, None) => Instant::now(),
+        };
+
+        self.prev = Some(next);
+
+        match self.duration {
+            Some(d) if next - start >= d => None,
+            _ => Some(next),
+        }
     }
 }
 
@@ -131,26 +125,32 @@ impl Builder {
                 ramp: None,
                 duration: None,
                 rate: None,
+                start: None,
+                prev: None,
             },
         }
     }
 
-    pub fn ramp(self, from: Rate, to: Rate, over: Duration) -> Builder {
-        self.plan.ramp = Some(Ramp { from, to, over });
+    pub fn ramp(mut self, from: Rate, to: Rate, over: Duration) -> Builder {
+        self.plan.ramp = Some(Ramp {
+            from,
+            to,
+            duration: over,
+        });
         self
     }
 
-    pub fn duration(self, duration: Duration) -> Builder {
-        self.plan.duration = duration;
+    pub fn duration(mut self, d: Duration) -> Builder {
+        self.plan.duration = Some(d);
         self
     }
 
-    pub fn rate(self, rate: Rate) -> Builder {
-        self.plan.rate = rate;
+    pub fn rate(mut self, r: Rate) -> Builder {
+        self.plan.rate = Some(r);
         self
     }
 
     pub fn build(&self) -> Result<Plan> {
-        Ok(self.plan)
+        Ok(self.plan.clone())
     }
 }

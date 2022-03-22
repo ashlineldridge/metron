@@ -1,11 +1,10 @@
-use anyhow::{Context, Error, Result};
+use anyhow::{Error, Result};
 use hyper::Uri;
 use std::time::{Duration, Instant};
 use tokio::runtime::Builder;
 
 use wrkr::Rate;
 
-use crate::plan::Plan;
 use crate::{client::ClientResult, signaller::Signaller};
 
 #[derive(Debug)]
@@ -118,37 +117,44 @@ pub fn run(config: &TestConfig) -> Result<TestResults> {
     })
 }
 
-fn create_signaller(config: &TestConfig) -> Result<Box<dyn Signaller>> {
-    let schedule = if let Some(ramp_duration) = config.ramp_duration {
-        let from = config.init_rate.context("Ramp requires an initial rate")?;
-        let to = config.rate.context("Ramp requires main rate")?;
-        let mut schedule = crate::schedule::ramped_rate(from, to, ramp_duration).boxed();
-        if let Some(duration) = config.duration {
-            let duration = ramp_duration + duration;
-            schedule = crate::schedule::finite(duration, schedule).boxed();
-        };
+fn create_signaller(_config: &TestConfig) -> Result<Signaller> {
+    // let plan = crate::plan::Builder::new()
+    //     .ramp(from, to, over)
+    //     .duration(duration)
+    //     .rate(rate)
+    //     .build()?;
 
-        Some(schedule)
-    } else if let Some(rate) = config.rate {
-        let mut schedule = crate::schedule::fixed_rate(rate).boxed();
-        if let Some(duration) = config.duration {
-            schedule = crate::schedule::finite(duration, schedule).boxed();
-        };
+    // let schedule = if let Some(ramp_duration) = config.ramp_duration {
+    //     let from = config.init_rate.context("Ramp requires an initial rate")?;
+    //     let to = config.rate.context("Ramp requires main rate")?;
+    //     let mut schedule = crate::schedule::ramped_rate(from, to, ramp_duration).boxed();
+    //     if let Some(duration) = config.duration {
+    //         let duration = ramp_duration + duration;
+    //         schedule = crate::schedule::finite(duration, schedule).boxed();
+    //     };
 
-        Some(schedule)
-    } else {
-        None
-    };
+    //     Some(schedule)
+    // } else if let Some(rate) = config.rate {
+    //     let mut schedule = crate::schedule::fixed_rate(rate).boxed();
+    //     if let Some(duration) = config.duration {
+    //         schedule = crate::schedule::finite(duration, schedule).boxed();
+    //     };
 
-    let signaller = if let Some(schedule) = schedule {
-        if config.async_signaller {
-            crate::signaller::async_signaller(schedule).boxed()
-        } else {
-            crate::signaller::blocking_signaller(schedule).boxed()
-        }
-    } else {
-        crate::signaller::asap_signaller(config.duration).boxed()
-    };
+    //     Some(schedule)
+    // } else {
+    //     None
+    // };
 
-    Ok(signaller)
+    // let signaller = if let Some(schedule) = schedule {
+    //     if config.async_signaller {
+    //         crate::signaller::async_signaller(schedule).boxed()
+    //     } else {
+    //         crate::signaller::blocking_signaller(schedule).boxed()
+    //     }
+    // } else {
+    //     crate::signaller::asap_signaller(config.duration).boxed()
+    // };
+
+    // Ok(signaller)
+    todo!()
 }

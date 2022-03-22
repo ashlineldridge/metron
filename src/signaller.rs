@@ -59,8 +59,6 @@ pub struct Signaller {
     kind: Kind,
     /// Plan used to determine request timing.
     plan: Plan,
-    /// Time when the signaller was started.
-    start: Option<Instant>,
     /// Sender part of the back-pressure channel.
     tx: Option<Sender<Signal>>,
     /// Receiver part of the back-pressure channel.
@@ -71,6 +69,7 @@ pub struct Signaller {
 ///
 /// The signaller kind dictates the concurrency model that the signaller uses
 /// to produce timing signals.
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     /// An `OnDemand` signaller produces timing signals when they are requested.
     /// This type of signaller does not use a background task or thread for
@@ -106,13 +105,7 @@ impl Signaller {
             (Some(tx), Some(rx))
         };
 
-        Self {
-            kind,
-            plan,
-            start: None,
-            tx,
-            rx,
-        }
+        Self { kind, plan, tx, rx }
     }
 
     /// Creates a new [on-demand][Kind::OnDemand] `Signaller`.
@@ -151,15 +144,13 @@ impl Signaller {
     /// be read. To ensure all signals have been read, the client should
     /// continue to call [`recv`][Self::recv] until `None` is returned.
     pub fn start(&mut self) -> JoinHandle<Result<()>> {
-        let start = Instant::now();
-        self.start = Some(start);
-
         match self.kind {
             Kind::OnDemand => tokio::task::spawn(std::future::ready(Ok(()))),
             Kind::BlockingThread => {
                 let tx = self.tx.take().expect(MULTIPLE_STARTS_ERROR);
+                let plan = self.plan.clone();
                 tokio::task::spawn_blocking(move || {
-                    for t in self.plan.iter(start) {
+                    for t in plan {
                         crate::wait::spin_until(t);
                         tx.blocking_send(Signal::new(t))?;
                     }
@@ -169,8 +160,9 @@ impl Signaller {
             }
             Kind::Cooperative => {
                 let tx = self.tx.take().expect(MULTIPLE_STARTS_ERROR);
+                let plan = self.plan.clone();
                 tokio::task::spawn(async move {
-                    for t in self.plan.iter(start) {
+                    for t in plan {
                         crate::wait::sleep_until(t).await;
                         tx.send(Signal::new(t)).await?;
                     }
@@ -181,7 +173,7 @@ impl Signaller {
         }
     }
 
-    /// Receive a ready signal if one is available.
+    /// Receive a waiting signal or wait until one is available.
     ///
     /// This function can be used to obtain the next available timing signal.
     /// The oldest available timing signal will be returned or the returned
@@ -191,11 +183,13 @@ impl Signaller {
     /// More to come...
     pub async fn recv(&mut self) -> Option<Signal> {
         if self.kind == Kind::OnDemand {
-            let now = Instant::now();
-            self.plan.next(self.start.unwrap(), now).map(Signal::new)
+            // We are doing on-demand signalling so retrieve the next instant
+            // directly from the plan rather than from the channel.
+            self.plan.next().map(|t| Signal::new(t))
         } else {
             // Safe to unwrap since we control the lifecycle of rx.
-            self.rx.unwrap().recv().await
+            let rx = self.rx.as_mut().unwrap();
+            rx.recv().await
         }
     }
 }
