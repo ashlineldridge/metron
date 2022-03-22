@@ -1,4 +1,4 @@
-mod args;
+mod cli;
 mod client;
 mod error;
 mod load;
@@ -10,7 +10,7 @@ mod wait;
 use anyhow::Result;
 
 fn main() -> Result<()> {
-    let _args = crate::args::parse_clap();
+    let _args = crate::cli::parse_clap();
 
     Ok(())
 }

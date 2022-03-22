@@ -9,30 +9,32 @@ use wrkr::Rate;
 /// test target.
 #[derive(Clone)]
 pub struct Plan {
-    /// Optional ramp used to increase rate over an initial duration.
-    ramp: Option<Ramp>,
-    /// Optional duration (none implies run forever).
-    duration: Option<Duration>,
-    /// Optional rate (none implies maximal rate).
-    rate: Option<Rate>,
+    /// Plan building blocks.
+    blocks: Vec<RateBlock>,
     /// When the plan was started (none if not started).
     start: Option<Instant>,
     /// Previously returned instant (none if not started).
     prev: Option<Instant>,
+    /// Cached plan duration (used for iterating).
+    duration: Option<Duration>,
 }
 
-/// Ramp specs used to vary the initial rate of the `Plan`.
-///
-/// Ramping can be used to increase the request rate over a fixed time period
-/// to allow the target infrastructure to scale up.
+/// Describes how request rate should be treated over a given duration.
 #[derive(Clone)]
-struct Ramp {
-    /// Rate that the ramp starts at.
-    from: Rate,
-    /// Rate that the ramp finishes at.
-    to: Rate,
-    /// Time period over which to vary the rate.
-    duration: Duration,
+enum RateBlock {
+    /// Rate should be fixed over the given duration (or forever).
+    Fixed(Rate, Option<Duration>),
+    /// Rate should vary linearly over the given duration.
+    Linear(Rate, Rate, Duration),
+}
+
+impl RateBlock {
+    fn duration(&self) -> Option<Duration> {
+        match self {
+            RateBlock::Fixed(_, d) => *d,
+            RateBlock::Linear(_, _, d) => Some(*d),
+        }
+    }
 }
 
 impl Plan {
@@ -40,6 +42,45 @@ impl Plan {
     pub fn reset(&mut self) {
         self.start = None;
         self.prev = None;
+    }
+
+    /// Gets the total duration of the plan.
+    ///
+    /// If the returned value is `None` the plan runs forever.
+    fn duration(&mut self) -> Option<Duration> {
+        if self.duration.is_none() {
+            self.duration =
+                self.blocks
+                    .iter()
+                    .fold(Some(Duration::from_secs(0)), |total, b| {
+                        match (total, b.duration()) {
+                            (Some(total), Some(d)) => Some(total + d),
+                            _ => None,
+                        }
+                    });
+        }
+
+        self.duration
+    }
+
+    /// Gets the `RateBlock` that `progress` falls into.
+    ///
+    /// If the returned value is `None` then we have completed the plan.
+    fn get_block(&self, progress: Duration) -> Option<RateBlock> {
+        let mut total = Duration::from_secs(0);
+        for b in &self.blocks {
+            if let Some(d) = b.duration() {
+                total += d;
+                if progress < total {
+                    return Some(b.clone());
+                }
+            } else {
+                // The plan runs forever.
+                return Some(b.clone());
+            }
+        }
+
+        None
     }
 }
 
@@ -53,34 +94,34 @@ impl Iterator for Plan {
         // How far into the plan are we?
         let progress = self.prev.unwrap_or(start) - start;
 
-        // Calculate the next instant that a request should be sent.
-        let next = match (&self.ramp, &self.rate) {
-            // Are we ramping the rate up?
-            (Some(ramp), _) if progress < ramp.duration => {
-                let ramp_from = ramp.from.as_interval().as_secs_f32();
-                let ramp_to = ramp.to.as_interval().as_secs_f32();
-                let progress = progress.as_secs_f32();
-                let ramp_duration = ramp.duration.as_secs_f32();
+        if let Some(block) = self.get_block(progress) {
+            // Calculate the next value in the series.
+            let next = match block {
+                RateBlock::Fixed(r, _) => self.prev.map(|t| t + r.as_interval()).unwrap_or(start),
+                RateBlock::Linear(from, to, d) => {
+                    let ramp_from = from.as_interval().as_secs_f32();
+                    let ramp_to = to.as_interval().as_secs_f32();
+                    let ramp_duration = d.as_secs_f32();
+                    let progress = progress.as_secs_f32();
 
-                let ramp_progress_factor =
-                    (ramp_from - ramp_to) * (progress / ramp_duration).min(1.0);
-                let delta = Duration::from_secs_f32(ramp_from - ramp_progress_factor);
+                    let ramp_progress_factor =
+                        (ramp_from - ramp_to) * (progress / ramp_duration).min(1.0);
+                    let delta = Duration::from_secs_f32(ramp_from - ramp_progress_factor);
 
-                self.prev.map(|t| t + delta).unwrap_or(start)
+                    self.prev.map(|t| t + delta).unwrap_or(start)
+                }
+            };
+
+            self.prev = Some(next);
+
+            // Check whether we've exceeded the duration.
+            match self.duration() {
+                Some(d) if next - start >= d => None,
+                _ => Some(next),
             }
-
-            // We must be doing a fixed-rate test.
-            (_, Some(rate)) => self.prev.map(|t| t + rate.as_interval()).unwrap_or(start),
-
-            // Are we going full tilt?
-            (_, None) => Instant::now(),
-        };
-
-        self.prev = Some(next);
-
-        match self.duration {
-            Some(d) if next - start >= d => None,
-            _ => Some(next),
+        } else {
+            // We've finished.
+            None
         }
     }
 }
@@ -122,31 +163,21 @@ impl Builder {
     pub fn new() -> Self {
         Self {
             plan: Plan {
-                ramp: None,
-                duration: None,
-                rate: None,
+                blocks: vec![],
                 start: None,
                 prev: None,
+                duration: None,
             },
         }
     }
 
-    pub fn ramp(mut self, from: Rate, to: Rate, over: Duration) -> Builder {
-        self.plan.ramp = Some(Ramp {
-            from,
-            to,
-            duration: over,
-        });
+    pub fn fixed(mut self, r: Rate, d: Option<Duration>) -> Builder {
+        self.plan.blocks.push(RateBlock::Fixed(r, d));
         self
     }
 
-    pub fn duration(mut self, d: Duration) -> Builder {
-        self.plan.duration = Some(d);
-        self
-    }
-
-    pub fn rate(mut self, r: Rate) -> Builder {
-        self.plan.rate = Some(r);
+    pub fn linear(mut self, start: Rate, end: Rate, d: Duration) -> Builder {
+        self.plan.blocks.push(RateBlock::Linear(start, end, d));
         self
     }
 
