@@ -18,8 +18,6 @@ pub(crate) fn command() -> clap::Command<'static> {
 /// Returns all [`clap::Arg`]s for the `load` subcommand.
 fn all_args() -> Vec<clap::Arg<'static>> {
     vec![
-        arg_worker_threads(),
-        arg_connections(),
         arg_duration(),
         arg_forever(),
         arg_rate(),
@@ -29,6 +27,11 @@ fn all_args() -> Vec<clap::Arg<'static>> {
         arg_ramp_rate_end(),
         arg_target(),
         arg_multi_target(),
+        arg_http_method(),
+        arg_payload(),
+        arg_payload_file(),
+        arg_worker_threads(),
+        arg_connections(),
     ]
 }
 
@@ -39,6 +42,7 @@ fn all_arg_groups() -> Vec<clap::ArgGroup<'static>> {
         arg_group_primary_duration(),
         arg_group_primary_rate(),
         arg_group_ramp(),
+        arg_group_payload(),
     ]
 }
 
@@ -78,6 +82,13 @@ fn arg_group_primary_rate() -> clap::ArgGroup<'static> {
 /// of the load test.
 fn arg_group_ramp() -> clap::ArgGroup<'static> {
     clap::ArgGroup::new("group-ramp").multiple(true)
+}
+
+/// Returns the [`clap::ArgGroup`] for payload arguments.
+///
+/// This argument group ensures that only one payload argument is specified.
+fn arg_group_payload() -> clap::ArgGroup<'static> {
+    clap::ArgGroup::new("group-payload").multiple(false)
 }
 
 /// Returns the [`clap::Arg`] for `--duration`.
@@ -164,7 +175,7 @@ and --ramp-rate-end.
     clap::Arg::new("max-rate")
         .long("max-rate")
         .groups(&["group-primary", "group-primary-rate"])
-        // .conflicts_with_all(&["main", "ramp"])
+        .conflicts_with("group-ramp")
         .help(SHORT)
         .long_help(LONG)
 }
@@ -267,7 +278,62 @@ This argument is incompatible with the <TARGET> positional argument.
         .long("multi-target")
         .group("group-target")
         .value_name("URL")
+        .multiple_occurrences(true)
         .validator(validator::url)
+        .help(SHORT)
+        .long_help(LONG)
+}
+
+/// Returns the [`clap::Arg`] for `--http-method`.
+fn arg_http_method() -> clap::Arg<'static> {
+    const SHORT: &str = "HTTP method.";
+    const LONG: &str = "\
+Sets the HTTP method to use when making requests of the target.
+
+If this argument is not specified, GET will be used. If this argument specifies
+a method that requires a payload then either --payload or --payload-file must
+also be specified.
+
+The following HTTP methods are supported: GET, POST, PUT, DELETE, HEAD, OPTIONS,
+CONNECT, PATCH, and TRACE.
+";
+
+    clap::Arg::new("http-method")
+        .long("http-method")
+        .value_name("METHOD")
+        .possible_values(&[
+            "GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "CONNECT", "PATCH", "TRACE",
+        ])
+        .help(SHORT)
+        .long_help(LONG)
+}
+
+/// Returns the [`clap::Arg`] for `--payload`.
+fn arg_payload() -> clap::Arg<'static> {
+    const SHORT: &str = "HTTP payload.";
+    const LONG: &str = "\
+Sets the HTTP payload to use when making requests of the target.
+";
+
+    clap::Arg::new("payload")
+        .long("payload")
+        .group("group-payload")
+        .value_name("PAYLOAD")
+        .help(SHORT)
+        .long_help(LONG)
+}
+
+/// Returns the [`clap::Arg`] for `--payload-file`.
+fn arg_payload_file() -> clap::Arg<'static> {
+    const SHORT: &str = "HTTP payload file.";
+    const LONG: &str = "\
+Sets the HTTP payload file to use when making requests of the target.
+";
+
+    clap::Arg::new("payload-file")
+        .long("payload-file")
+        .group("group-payload")
+        .value_name("FILE")
         .help(SHORT)
         .long_help(LONG)
 }
