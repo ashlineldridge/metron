@@ -1,3 +1,5 @@
+mod config;
+
 use anyhow::Result;
 use hyper::{
     service::{make_service_fn, service_fn},
@@ -6,14 +8,11 @@ use hyper::{
 use std::convert::Infallible;
 use tokio::runtime::Builder;
 
-pub struct ServeConfig {
-    pub port: u16,
-    pub threads: usize,
-}
+pub use self::config::Config;
 
-pub fn serve(config: &ServeConfig) -> Result<()> {
+pub fn serve(config: &Config) -> Result<()> {
     let runtime = Builder::new_multi_thread()
-        .worker_threads(config.threads)
+        .worker_threads(config.worker_threads)
         .enable_all()
         .build()?;
 
@@ -22,7 +21,7 @@ pub fn serve(config: &ServeConfig) -> Result<()> {
     Ok(())
 }
 
-async fn run_server(config: &ServeConfig) -> Result<()> {
+async fn run_server(config: &Config) -> Result<()> {
     let service =
         make_service_fn(|_conn| async { Ok::<_, Infallible>(service_fn(handle_request)) });
     let addr = ([127, 0, 0, 1], config.port).into();

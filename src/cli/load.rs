@@ -30,8 +30,11 @@ fn all_args() -> Vec<clap::Arg<'static>> {
         arg_http_method(),
         arg_payload(),
         arg_payload_file(),
+        arg_header(),
         arg_worker_threads(),
+        arg_single_threaded(),
         arg_connections(),
+        arg_signaller(),
     ]
 }
 
@@ -290,12 +293,10 @@ fn arg_http_method() -> clap::Arg<'static> {
     const LONG: &str = "\
 Sets the HTTP method to use when making requests of the target.
 
-If this argument is not specified, GET will be used. If this argument specifies
-a method that requires a payload then either --payload or --payload-file must
+If this argument is not specifed and no payload is specified (--payload or
+--payload-file) then HTTP GET will be assumed. If this argument is not specified
+and a payload is specified then HTTP POST will be assumed.
 also be specified.
-
-The following HTTP methods are supported: GET, POST, PUT, DELETE, HEAD, OPTIONS,
-CONNECT, PATCH, and TRACE.
 ";
 
     clap::Arg::new("http-method")
@@ -312,7 +313,11 @@ CONNECT, PATCH, and TRACE.
 fn arg_payload() -> clap::Arg<'static> {
     const SHORT: &str = "HTTP payload.";
     const LONG: &str = "\
-Sets the HTTP payload to use when making requests of the target.
+Sets the HTTP payload string to use when making requests of the target.
+
+If a payload-based HTTP method such as POST or PUT has been specified
+(--http-method), and no payload has been specified (--payload or --payload-file)
+then an empty payload will be used.
 ";
 
     clap::Arg::new("payload")
@@ -328,12 +333,37 @@ fn arg_payload_file() -> clap::Arg<'static> {
     const SHORT: &str = "HTTP payload file.";
     const LONG: &str = "\
 Sets the HTTP payload file to use when making requests of the target.
+
+If a payload-based HTTP method such as POST or PUT has been specified
+(--http-method), and no payload has been specified (--payload or --payload-file)
+then an empty payload will be used.
 ";
 
     clap::Arg::new("payload-file")
         .long("payload-file")
         .group("group-payload")
         .value_name("FILE")
+        .validator(validator::readable_file)
+        .help(SHORT)
+        .long_help(LONG)
+}
+
+/// Returns the [`clap::Arg`] for `--header`.
+fn arg_header() -> clap::Arg<'static> {
+    const SHORT: &str = "HTTP header in K:V format.";
+    const LONG: &str = "\
+Sets the specified header to be included in all requests. The value for this
+argument should be in K:V format, where K is the header name and V is the
+header value.
+
+This argument can be specified multiple times.
+";
+
+    clap::Arg::new("header")
+        .long("header")
+        .value_name("K:V")
+        .multiple_occurrences(true)
+        .validator(validator::kv)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -359,6 +389,30 @@ This argument defaults to the number of cores on the host machine.
         .long_help(LONG)
 }
 
+/// Returns the [`clap::Arg`] for `--single-threaded`.
+fn arg_single_threaded() -> clap::Arg<'static> {
+    const SHORT: &str = "Don't spawn threads.";
+    const LONG: &str = "\
+Forces all operations to run on the main thread.
+
+The utility of this argument is unknown beyond providing interesting data on how
+the number of threads affects performance of the tool itself. This argument
+forces all operations to run on the main thread whereas --worker-threads=1 will
+result in the main thread creating a single worker thread to perform the
+requests.
+
+This argument is incompatible with --worker-threads and
+--signaller=blocking-thread.
+";
+
+    clap::Arg::new("single-threaded")
+        .long("single-threaded")
+        .value_name("COUNT")
+        .validator(validator::usize)
+        .help(SHORT)
+        .long_help(LONG)
+}
+
 /// Returns the [`clap::Arg`] for `--connections`.
 fn arg_connections() -> clap::Arg<'static> {
     const SHORT: &str = "Number of TCP connections to use.";
@@ -373,6 +427,27 @@ TODO: Elaborate.
         .value_name("COUNT")
         .default_value("1")
         .validator(validator::usize)
+        .help(SHORT)
+        .long_help(LONG)
+}
+
+/// Returns the [`clap::Arg`] for `--signaller`.
+fn arg_signaller() -> clap::Arg<'static> {
+    const SHORT: &str = "Method for generating timing signals.";
+    const LONG: &str = "\
+Selects the type of signalling system that should be used to generate request
+timing signals. This is an advanced feature and the default behaviour will
+generally be what you want.
+
+By default, a blocking-thread signaller will be used unless --max-rate has been
+specified, in which case an on-demand signaller is used as maximum throughput
+tests don't require timing signals.
+";
+
+    clap::Arg::new("signaller")
+        .long("signaller")
+        .value_name("NAME")
+        .possible_values(&["blocking-thread", "on-demand", "cooperative"])
         .help(SHORT)
         .long_help(LONG)
 }

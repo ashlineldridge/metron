@@ -1,16 +1,14 @@
 mod cli;
-mod client;
+mod config;
 mod error;
 mod load;
-mod plan;
 mod server;
-mod signaller;
 mod wait;
 
 use anyhow::Result;
 
 fn main() -> Result<()> {
-    let _args = crate::cli::parse_clap();
+    let _config = crate::cli::parse();
 
     Ok(())
 }

@@ -7,7 +7,7 @@ use wrkr::Rate;
 ///
 /// The plan dictates when requests should be sent should be sent to the
 /// test target.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Plan {
     /// Plan building blocks.
     blocks: Vec<RateBlock>,
@@ -20,8 +20,8 @@ pub struct Plan {
 }
 
 /// Describes how request rate should be treated over a given duration.
-#[derive(Clone)]
-enum RateBlock {
+#[derive(Clone, Debug)]
+pub enum RateBlock {
     /// Rate should be fixed over the given duration (or forever).
     Fixed(Rate, Option<Duration>),
     /// Rate should vary linearly over the given duration.

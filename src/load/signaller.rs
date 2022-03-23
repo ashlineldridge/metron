@@ -5,7 +5,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::plan::Plan;
+use crate::load::plan::Plan;
 
 const BACK_PRESSURE_CHAN_SIZE: usize = 1024;
 const MULTIPLE_STARTS_ERROR: &str = "`Signaller` can only be started once";
@@ -69,7 +69,7 @@ pub struct Signaller {
 ///
 /// The signaller kind dictates the concurrency model that the signaller uses
 /// to produce timing signals.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     /// An `OnDemand` signaller produces timing signals when they are requested.
     /// This type of signaller does not use a background task or thread for

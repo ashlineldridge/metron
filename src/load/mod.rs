@@ -1,48 +1,36 @@
+mod client;
+mod config;
+mod plan;
+mod report;
+mod signaller;
+
 use anyhow::{Error, Result};
-use hyper::Uri;
 use std::time::{Duration, Instant};
-use tokio::runtime::Builder;
 
-use wrkr::Rate;
+use self::client::ClientResult;
+use self::report::Report;
+use self::signaller::Signaller;
 
-use crate::{client::ClientResult, signaller::Signaller};
+pub use self::config::Config;
+pub use self::plan::Plan;
+pub use self::plan::RateBlock;
+pub use self::signaller::Kind as SignallerKind;
 
-#[derive(Debug)]
-pub struct TestConfig {
-    pub connections: usize,
-    pub worker_threads: usize,
-    pub async_signaller: bool,
-    pub rate: Option<Rate>,
-    pub duration: Option<Duration>,
-    pub init_rate: Option<Rate>,
-    pub ramp_duration: Option<Duration>,
-    pub headers: Vec<Header>,
-    pub target: Uri,
-}
-
-#[derive(Debug)]
-pub struct TestResults {
-    pub total_requests: usize,
-    pub total_errors: usize,
-    pub total_duration: Duration,
-    pub avg_latency: Duration,
-}
-
-#[derive(Debug)]
-pub struct Header {
-    pub name: String,
-    pub value: String,
-}
-
-pub fn run(config: &TestConfig) -> Result<TestResults> {
-    let runtime = Builder::new_multi_thread()
-        .worker_threads(config.worker_threads)
-        .enable_all()
-        .build()?;
+pub fn run(config: &Config) -> Result<Report> {
+    let runtime = if let Some(worker_threads) = config.worker_threads {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(worker_threads)
+            .enable_all()
+            .build()?
+    } else {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?
+    };
 
     let _guard = runtime.enter();
 
-    let target_uri = config.target.clone();
+    let target_uri = config.targets[0].to_string().parse::<hyper::Uri>()?;
     let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
     let mut signaller = create_signaller(config)?;
     signaller.start();
@@ -61,6 +49,13 @@ pub fn run(config: &TestConfig) -> Result<TestResults> {
 
             tokio::spawn(async move {
                 let sent = Instant::now();
+
+                let req = hyper::Request::builder()
+                    .method(hyper::Method::POST)
+                    .uri("http://httpbin.org/post")
+                    .body(hyper::Body::from("Hallo!"))
+                    .expect("request builder");
+
                 let resp = client.get(target_uri).await;
                 let done = Instant::now();
                 let status = resp
@@ -109,7 +104,7 @@ pub fn run(config: &TestConfig) -> Result<TestResults> {
 
     dbg!((total_responses, total_200s, total_non200s, total_errors));
 
-    Ok(TestResults {
+    Ok(Report {
         total_requests: 0,
         total_errors: 0,
         total_duration: Duration::from_secs(0),
@@ -117,7 +112,7 @@ pub fn run(config: &TestConfig) -> Result<TestResults> {
     })
 }
 
-fn create_signaller(_config: &TestConfig) -> Result<Signaller> {
+fn create_signaller(_config: &Config) -> Result<Signaller> {
     // let plan = crate::plan::Builder::new()
     //     .ramp(from, to, over)
     //     .duration(duration)
