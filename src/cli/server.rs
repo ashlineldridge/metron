@@ -1,4 +1,11 @@
-/// Creates the `server` subcommand.
+use crate::cli::validator;
+
+/// Creates the [`clap::Command`] for the `server` subcommand.
+///
+/// # Examples
+/// ```bash
+/// wrkr server --port 8080
+/// ```
 pub(crate) fn command() -> clap::Command<'static> {
     clap::Command::new("server")
         .arg(arg_port())
@@ -16,7 +23,7 @@ Sets the server listening port to PORT. Defaults to 8000.
         .long("port")
         .value_name("PORT")
         .default_value("8000")
-        .validator(|s| s.parse::<u16>())
+        .validator(validator::u16)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -34,7 +41,7 @@ host machine.
     clap::Arg::new("worker-threads")
         .long("worker-threads")
         .value_name("COUNT")
-        .validator(|s| s.parse::<usize>())
+        .validator(validator::usize)
         .help(SHORT)
         .long_help(LONG)
 }

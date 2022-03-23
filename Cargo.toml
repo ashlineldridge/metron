@@ -12,3 +12,4 @@ humantime = "2.1.0"
 hyper = { version = "0.14.17", features = ["full"] }
 hyper-tls = "0.5.0"
 tokio = { version = "1.17.0", features = ["full"] }
+url = "2.2.2"
