@@ -13,6 +13,7 @@ pub struct Config {
     pub payload: String,
     pub worker_threads: Option<usize>,
     pub signaller_kind: SignallerKind,
+    pub log_level: log::Level,
 }
 
 #[derive(Clone, Debug)]

@@ -49,8 +49,8 @@ TODO: Elaborate.
     clap::Arg::new("log-level")
         .long("log-level")
         .value_name("LEVEL")
-        .default_value("warn")
-        .possible_values(&["trace", "debug", "info", "warn", "error", "critical"])
+        .default_value("off")
+        .possible_values(&["off", "trace", "debug", "info", "warn", "error"])
         .help(SHORT)
         .long_help(LONG)
 }
