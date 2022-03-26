@@ -1,4 +1,5 @@
 use url::Url;
+use wrkr::LogLevel;
 
 use crate::load::RateBlock;
 use crate::load::SignallerKind;
@@ -13,7 +14,7 @@ pub struct Config {
     pub payload: String,
     pub worker_threads: Option<usize>,
     pub signaller_kind: SignallerKind,
-    pub log_level: log::Level,
+    pub log_level: LogLevel,
 }
 
 #[derive(Clone, Debug)]

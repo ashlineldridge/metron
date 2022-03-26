@@ -22,3 +22,5 @@ impl Deref for Rate {
         &self.0
     }
 }
+
+pub type LogLevel = log::LevelFilter;

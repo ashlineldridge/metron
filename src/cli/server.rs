@@ -1,4 +1,4 @@
-use crate::cli::validator;
+use crate::cli::validate::validate;
 
 /// Creates the [`clap::Command`] for the `server` subcommand.
 ///
@@ -23,7 +23,7 @@ Sets the server listening port to PORT. Defaults to 8000.
         .long("port")
         .value_name("PORT")
         .default_value("8000")
-        .validator(validator::u16)
+        .validator(validate::<u16>)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -41,7 +41,7 @@ host machine.
     clap::Arg::new("worker-threads")
         .long("worker-threads")
         .value_name("COUNT")
-        .validator(validator::usize)
+        .validator(validate::<usize>)
         .help(SHORT)
         .long_help(LONG)
 }

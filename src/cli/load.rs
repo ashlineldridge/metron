@@ -1,4 +1,4 @@
-use crate::cli::validator;
+use crate::cli::validate::{self, validate};
 
 /// Creates the [`clap::Command`] for the `load` subcommand.
 ///
@@ -9,7 +9,7 @@ use crate::cli::validator;
 ///   --rate 100 \
 ///   https://example.com
 /// ```
-pub(crate) fn command() -> clap::Command<'static> {
+pub fn command() -> clap::Command<'static> {
     clap::Command::new("load")
         .args(all_args())
         .groups(all_arg_groups())
@@ -202,7 +202,7 @@ See https://docs.rs/humantime/latest/humantime for time format details.
         .group("group-ramp")
         .requires_all(&["ramp-rate-start", "ramp-rate-end"])
         .value_name("DURATION")
-        .validator(validator::duration)
+        .validator(validate::<humantime::Duration>)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -260,7 +260,7 @@ also be specified.
     clap::Arg::new("target")
         .group("group-target")
         .value_name("URL")
-        .validator(validator::url)
+        .validator(validate::url)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -282,7 +282,7 @@ This argument is incompatible with the <TARGET> positional argument.
         .group("group-target")
         .value_name("URL")
         .multiple_occurrences(true)
-        .validator(validator::url)
+        .validator(validate::url)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -343,7 +343,7 @@ then an empty payload will be used.
         .long("payload-file")
         .group("group-payload")
         .value_name("FILE")
-        .validator(validator::readable_file)
+        .validator(validate::file)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -363,7 +363,7 @@ This argument can be specified multiple times.
         .long("header")
         .value_name("K:V")
         .multiple_occurrences(true)
-        .validator(validator::kv)
+        .validator(validate::key_value)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -384,7 +384,7 @@ This argument defaults to the number of cores on the host machine.
     clap::Arg::new("worker-threads")
         .long("worker-threads")
         .value_name("COUNT")
-        .validator(validator::usize)
+        .validator(validate::<usize>)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -408,7 +408,7 @@ This argument is incompatible with --worker-threads and
     clap::Arg::new("single-threaded")
         .long("single-threaded")
         .value_name("COUNT")
-        .validator(validator::usize)
+        .validator(validate::<usize>)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -426,7 +426,8 @@ TODO: Elaborate.
         .long("connections")
         .value_name("COUNT")
         .default_value("1")
-        .validator(validator::usize)
+        // .validator(validate::validate::<usize>)
+        .validator(validate::<usize>)
         .help(SHORT)
         .long_help(LONG)
 }

@@ -10,7 +10,7 @@ use tokio::runtime::Builder;
 
 pub use self::config::Config;
 
-pub fn serve(config: &Config) -> Result<()> {
+pub fn run(config: &Config) -> Result<()> {
     let runtime = Builder::new_multi_thread()
         .worker_threads(config.worker_threads)
         .enable_all()
