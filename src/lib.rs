@@ -1,4 +1,4 @@
-use std::{ops::Deref, time::Duration};
+use std::{ops::Deref, str::FromStr, time::Duration};
 
 #[derive(Clone, Copy)]
 pub struct Rate(pub u32);
@@ -20,6 +20,14 @@ impl Deref for Rate {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl FromStr for Rate {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Rate(u32::from_str(s)?))
     }
 }
 
