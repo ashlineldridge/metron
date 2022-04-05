@@ -5,18 +5,17 @@ mod load;
 mod server;
 mod wait;
 
-use std::process;
-
-use anyhow::Result;
 use config::Config;
 use wrkr::LogLevel;
+
+pub type Result<T> = std::result::Result<T, crate::error::Error>;
 
 fn main() {
     if let Err(e) = try_main() {
         // TODO: Need proper error handling
         // The underlying clap error
         println!("{}", e);
-        process::exit(1);
+        std::process::exit(1);
     }
 }
 

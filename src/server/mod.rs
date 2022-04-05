@@ -1,6 +1,7 @@
 mod config;
 
-use anyhow::Result;
+use crate::Result;
+
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
@@ -34,6 +35,6 @@ async fn run_server(config: &Config) -> Result<()> {
     Ok(())
 }
 
-async fn handle_request(_: Request<Body>) -> Result<Response<Body>, Infallible> {
+async fn handle_request(_: Request<Body>) -> std::result::Result<Response<Body>, Infallible> {
     Ok(Response::new(Body::from("Hello")))
 }

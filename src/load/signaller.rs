@@ -1,4 +1,3 @@
-use anyhow::Result;
 use std::time::Instant;
 use tokio::{
     sync::mpsc::{Receiver, Sender},
@@ -6,6 +5,7 @@ use tokio::{
 };
 
 use crate::load::plan::Plan;
+use crate::Result;
 
 const BACK_PRESSURE_CHAN_SIZE: usize = 1024;
 const MULTIPLE_STARTS_ERROR: &str = "`Signaller` can only be started once";

@@ -1,4 +1,5 @@
-use anyhow::Result;
+use crate::Result;
+
 use std::time::{Duration, Instant};
 
 use wrkr::Rate;
@@ -133,24 +134,11 @@ impl Iterator for Plan {
 /// use crate::plan::Builder;
 /// use wrkr::Rate;
 ///
-/// // Construct a maximal throughput plan that runs forever.
-/// let plan = Builder::new()
-///   .build()
-///   .unwrap();
-///
-/// // Construct a fixed throughput plan (500 RPS) that runs for 5 minutes.
-/// let plan = Builder::new()
-///   .rate(Rate(500))
-///   .duration(Duration::from_secs(5 * 60))
-///   .build()
-///   .unwrap();
-///
 /// // Construct a plan that ramps up throughput from 10 RPS to 500 RPS over
 /// // the first 60 seconds and then maintains 500 RPS for a further 5 minutes.
 /// let plan = Builder::new()
-///   .ramp(Rate(10), Rate(500), Duration::from_secs(60))
-///   .rate(Rate(500))
-///   .duration(Duration::from_secs(5 * 60))
+///   .linear_rate_block(Rate(10), Rate(500), Duration::from_secs(60))
+///   .fixed_rate_block(Rate(500), Duration::from_secs(5 * 60))
 ///   .build()
 ///   .unwrap();
 /// ```
@@ -171,12 +159,12 @@ impl Builder {
         }
     }
 
-    pub fn fixed(mut self, r: Rate, d: Option<Duration>) -> Builder {
+    pub fn fixed_rate_block(mut self, r: Rate, d: Option<Duration>) -> Builder {
         self.plan.blocks.push(RateBlock::Fixed(r, d));
         self
     }
 
-    pub fn linear(mut self, start: Rate, end: Rate, d: Duration) -> Builder {
+    pub fn linear_rate_block(mut self, start: Rate, end: Rate, d: Duration) -> Builder {
         self.plan.blocks.push(RateBlock::Linear(start, end, d));
         self
     }

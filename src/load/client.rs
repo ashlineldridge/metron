@@ -21,8 +21,6 @@
 
 use std::time::{Duration, Instant};
 
-use anyhow::Error;
-
 pub type StatusCode = u16;
 
 #[derive(Debug)]
@@ -30,7 +28,7 @@ pub struct ClientResult {
     pub due: Instant,
     pub sent: Instant,
     pub done: Instant,
-    pub status: Result<StatusCode, Error>,
+    // pub status: std::result::Result<StatusCode, std::error::Error>,
 }
 
 impl ClientResult {

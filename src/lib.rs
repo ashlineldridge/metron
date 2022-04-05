@@ -26,7 +26,7 @@ impl Deref for Rate {
 impl FromStr for Rate {
     type Err = std::num::ParseIntError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
         Ok(Rate(u32::from_str(s)?))
     }
 }

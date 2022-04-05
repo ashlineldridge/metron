@@ -1,9 +1,10 @@
-use anyhow::Result;
 use std::process;
 use std::{fmt::Display, str::FromStr};
 use wrkr::Rate;
 
+use crate::error::Error;
 use crate::load::RateBlock;
+use crate::Result;
 
 use super::root;
 
@@ -41,15 +42,22 @@ fn load_config(matches: &clap::ArgMatches) -> Result<crate::config::Config> {
         ));
     }
 
-    let duration = if matches.is_present("duration") {
-        Some(
-            matches
-                .value_of_t::<humantime::Duration>("duration")
-                .map(|d| d.into())?,
-        )
-    } else {
-        None
-    };
+    // let duration = if matches.is_present("duration") {
+    //     Some(
+    //         matches
+    //             .value_of_t::<humantime::Duration>("duration")
+    //             .map(|d| d.into())?,
+    //     )
+    // } else {
+    //     None
+    // };
+
+    if matches.is_present("max-rate") {
+        return Err(Error::Cli(clap::Error::raw(
+            clap::ErrorKind::Format,
+            "--max-rate is not currently supported",
+        )));
+    }
 
     let rate = matches.value_of("rate");
     let duration = matches.value_of("duration");

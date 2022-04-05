@@ -4,17 +4,19 @@ mod plan;
 mod report;
 mod signaller;
 
-use anyhow::{Error, Result};
+use crate::Result;
+
 use std::time::{Duration, Instant};
 
-use self::client::ClientResult;
 use self::report::Report;
 use self::signaller::Signaller;
 
+pub use self::client::ClientResult;
 pub use self::config::Config;
 pub use self::plan::Plan;
 pub use self::plan::RateBlock;
 pub use self::signaller::Kind as SignallerKind;
+pub use self::signaller::Signal;
 
 pub fn run(config: &Config) -> Result<Report> {
     let runtime = if let Some(worker_threads) = config.worker_threads {
@@ -58,24 +60,24 @@ pub fn run(config: &Config) -> Result<Report> {
 
                 let resp = client.get(target_uri).await;
                 let done = Instant::now();
-                let status = resp
-                    .map(|resp| resp.status().as_u16())
-                    .map_err(|err| err.into());
+                // let status = resp
+                //     .map(|resp| resp.status().as_u16())
+                //     .map_err(|err| err.into());
 
                 let result = ClientResult {
                     due: sig.due,
                     sent,
                     done,
-                    status,
+                    // status,
                 };
 
                 tx.send(result).await?;
 
-                Result::<(), Error>::Ok(())
+                Result::Ok(())
             });
         }
 
-        Result::<(), Error>::Ok(())
+        Result::Ok(())
     });
 
     let (total_responses, total_200s, total_non200s, total_errors) = runtime.block_on(async move {
@@ -90,11 +92,11 @@ pub fn run(config: &Config) -> Result<Report> {
             println!("Read response: {:?}", r.corrected_latency());
 
             total_responses += 1;
-            match r.status {
-                Ok(status) if status != 200 => total_non200s += 1,
-                Ok(_) => total_200s += 1,
-                Err(_) => total_errors += 1,
-            }
+            // match r.status {
+            //     Ok(status) if status != 200 => total_non200s += 1,
+            //     Ok(_) => total_200s += 1,
+            //     Err(_) => total_errors += 1,
+            // }
         }
 
         println!("Done reading");
