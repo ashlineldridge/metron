@@ -1,6 +1,12 @@
 use std::{fmt::Display, io};
 
+use snafu::prelude::*;
 use tokio::sync::mpsc;
+
+// This is an antipattern
+
+#[derive(Debug, Snafu)]
+pub enum MyError {}
 
 /// `Error` enumerates all errors in the application.
 #[derive(Debug)]

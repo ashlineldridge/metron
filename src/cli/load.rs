@@ -44,6 +44,7 @@ fn all_arg_groups() -> Vec<clap::ArgGroup<'static>> {
         arg_group_primary(),
         arg_group_primary_duration(),
         arg_group_primary_rate(),
+        arg_group_target(),
         arg_group_ramp(),
         arg_group_payload(),
     ]
@@ -74,6 +75,15 @@ fn arg_group_primary_duration() -> clap::ArgGroup<'static> {
 /// `--rate` or `--max-rate`).
 fn arg_group_primary_rate() -> clap::ArgGroup<'static> {
     clap::ArgGroup::new("group-primary-rate")
+        .multiple(false)
+        .required(true)
+}
+
+/// Returns the [`clap::ArgGroup`] for the target arguments.
+///
+/// This argument group ensures that at least one target has been set.
+fn arg_group_target() -> clap::ArgGroup<'static> {
+    clap::ArgGroup::new("group-target")
         .multiple(false)
         .required(true)
 }
@@ -253,8 +263,8 @@ fn arg_target() -> clap::Arg<'static> {
     const LONG: &str = "\
 Sets the target URL for the load test. HTTP and HTTPS URLs are supported.
 
-If this argument is specified, both --ramp-duration and --ramp-rate-start must
-also be specified.
+To specify multiple targets see --multi-target. Either this positional argument
+or --multi-target must be specified, but not both.
 ";
 
     clap::Arg::new("target")
@@ -302,6 +312,7 @@ also be specified.
     clap::Arg::new("http-method")
         .long("http-method")
         .value_name("METHOD")
+        .default_value("GET")
         .possible_values(&[
             "GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "CONNECT", "PATCH", "TRACE",
         ])
@@ -376,7 +387,7 @@ Sets the number of worker threads to be used by the runtime to COUNT.
 
 The worker threads are the set of threads that are cooperatively scheduled to
 perform the load test. This number does not include the thread allocated to the
-signaller if a blocking-thread signaller is used (see --signaller-type).
+signaller if a blocking-thread signaller is used (see --signaller).
 
 This argument defaults to the number of cores on the host machine.
 ";
@@ -426,7 +437,6 @@ TODO: Elaborate.
         .long("connections")
         .value_name("COUNT")
         .default_value("1")
-        // .validator(validate::validate::<usize>)
         .validator(validate::<usize>)
         .help(SHORT)
         .long_help(LONG)
@@ -448,6 +458,7 @@ tests don't require timing signals.
     clap::Arg::new("signaller")
         .long("signaller")
         .value_name("NAME")
+        .default_value("blocking-thread")
         .possible_values(&["blocking-thread", "on-demand", "cooperative"])
         .help(SHORT)
         .long_help(LONG)
