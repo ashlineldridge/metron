@@ -1,14 +1,11 @@
 mod cli;
 mod config;
-mod error;
 mod load;
 mod server;
 mod wait;
 
 use config::Config;
 use wrkr::LogLevel;
-
-pub type Result<T> = std::result::Result<T, crate::error::Error>;
 
 fn main() {
     if let Err(e) = try_main() {
@@ -17,9 +14,12 @@ fn main() {
         println!("{}", e);
         std::process::exit(1);
     }
+
+    // See https://docs.rs/snafu/0.7.0/snafu/guide/examples/backtrace/enum.Error.html
+    // for example of printing error and backtrace.
 }
 
-fn try_main() -> Result<()> {
+fn try_main() -> Result<(), anyhow::Error> {
     let config = crate::cli::parse()?;
 
     init_logging(config.log_level());

@@ -1,9 +1,9 @@
 use std::str::FromStr;
 
+use anyhow::bail;
 use url::Url;
 use wrkr::LogLevel;
 
-use crate::error::Error;
 use crate::load::RateBlock;
 use crate::load::SignallerKind;
 
@@ -27,7 +27,7 @@ pub struct Header {
 }
 
 impl FromStr for Header {
-    type Err = Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Some((k, v)) = s.split_once(':') {
@@ -36,7 +36,7 @@ impl FromStr for Header {
                 value: v.into(),
             })
         } else {
-            Err(Error::GenericError(format!("Invalid K:V value: {}", s)))
+            bail!("Invalid K:V value: {}", s);
         }
     }
 }

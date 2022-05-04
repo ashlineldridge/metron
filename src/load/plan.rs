@@ -1,7 +1,4 @@
-use crate::Result;
-
 use std::time::{Duration, Instant};
-
 use wrkr::Rate;
 
 /// Timing plan for outbound requests.
@@ -169,7 +166,7 @@ impl Builder {
         self
     }
 
-    pub fn build(&self) -> Result<Plan> {
+    pub fn build(&self) -> Result<Plan, anyhow::Error> {
         Ok(self.plan.clone())
     }
 }

@@ -4,8 +4,6 @@ mod plan;
 mod report;
 mod signaller;
 
-use crate::Result;
-
 use std::time::{Duration, Instant};
 
 use self::report::Report;
@@ -18,7 +16,7 @@ pub use self::plan::RateBlock;
 pub use self::signaller::Kind as SignallerKind;
 pub use self::signaller::Signal;
 
-pub fn run(config: &Config) -> Result<Report> {
+pub fn run(config: &Config) -> Result<Report, anyhow::Error> {
     let runtime = if let Some(worker_threads) = config.worker_threads {
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(worker_threads)
@@ -52,6 +50,7 @@ pub fn run(config: &Config) -> Result<Report> {
             tokio::spawn(async move {
                 let sent = Instant::now();
 
+                // TODO Fix request
                 let req = hyper::Request::builder()
                     .method(hyper::Method::POST)
                     .uri("http://httpbin.org/post")
@@ -60,24 +59,24 @@ pub fn run(config: &Config) -> Result<Report> {
 
                 let resp = client.get(target_uri).await;
                 let done = Instant::now();
-                // let status = resp
-                //     .map(|resp| resp.status().as_u16())
-                //     .map_err(|err| err.into());
+                let status = resp
+                    .map(|resp| resp.status().as_u16())
+                    .map_err(|e| e.into());
 
                 let result = ClientResult {
                     due: sig.due,
                     sent,
                     done,
-                    // status,
+                    status,
                 };
 
                 tx.send(result).await?;
 
-                Result::Ok(())
+                Result::<(), anyhow::Error>::Ok(())
             });
         }
 
-        Result::Ok(())
+        Result::<(), anyhow::Error>::Ok(())
     });
 
     let (total_responses, total_200s, total_non200s, total_errors) = runtime.block_on(async move {
@@ -114,7 +113,7 @@ pub fn run(config: &Config) -> Result<Report> {
     })
 }
 
-fn create_signaller(_config: &Config) -> Result<Signaller> {
+fn create_signaller(_config: &Config) -> Result<Signaller, anyhow::Error> {
     // let plan = crate::plan::Builder::new()
     //     .ramp(from, to, over)
     //     .duration(duration)

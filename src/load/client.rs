@@ -28,7 +28,7 @@ pub struct ClientResult {
     pub due: Instant,
     pub sent: Instant,
     pub done: Instant,
-    // pub status: std::result::Result<StatusCode, std::error::Error>,
+    pub status: std::result::Result<StatusCode, anyhow::Error>,
 }
 
 impl ClientResult {

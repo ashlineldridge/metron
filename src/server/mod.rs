@@ -1,7 +1,5 @@
 mod config;
 
-use crate::Result;
-
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
@@ -11,7 +9,7 @@ use tokio::runtime::Builder;
 
 pub use self::config::Config;
 
-pub fn run(config: &Config) -> Result<()> {
+pub fn run(config: &Config) -> Result<(), anyhow::Error> {
     let runtime = Builder::new_multi_thread()
         .worker_threads(config.worker_threads)
         .enable_all()
@@ -22,7 +20,7 @@ pub fn run(config: &Config) -> Result<()> {
     Ok(())
 }
 
-async fn run_server(config: &Config) -> Result<()> {
+async fn run_server(config: &Config) -> Result<(), anyhow::Error> {
     let service =
         make_service_fn(|_conn| async { Ok::<_, Infallible>(service_fn(handle_request)) });
     let addr = ([127, 0, 0, 1], config.port).into();
