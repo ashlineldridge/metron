@@ -21,7 +21,7 @@ fn all_args() -> Vec<clap::Arg<'static>> {
         arg_duration(),
         arg_forever(),
         arg_rate(),
-        arg_max_rate(),
+        // arg_max_rate(),
         arg_ramp_duration(),
         arg_ramp_rate_start(),
         arg_ramp_rate_end(),

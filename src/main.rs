@@ -4,22 +4,11 @@ mod load;
 mod server;
 mod wait;
 
+use anyhow::Result;
 use config::Config;
 use wrkr::LogLevel;
 
-fn main() {
-    if let Err(e) = try_main() {
-        // TODO: Need proper error handling
-        // The underlying clap error
-        println!("{}", e);
-        std::process::exit(1);
-    }
-
-    // See https://docs.rs/snafu/0.7.0/snafu/guide/examples/backtrace/enum.Error.html
-    // for example of printing error and backtrace.
-}
-
-fn try_main() -> Result<(), anyhow::Error> {
+fn main() -> Result<()> {
     let config = crate::cli::parse()?;
 
     init_logging(config.log_level());

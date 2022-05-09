@@ -1,4 +1,5 @@
 use anyhow::bail;
+use anyhow::Result;
 use std::{str::FromStr, time::Instant};
 use tokio::{
     sync::mpsc::{Receiver, Sender},
@@ -143,36 +144,34 @@ impl Signaller {
     /// signals is complete and not that there are no more signals available to
     /// be read. To ensure all signals have been read, the client should
     /// continue to call [`recv`][Self::recv] until `None` is returned.
-    pub fn start(&mut self) -> JoinHandle<Result<(), anyhow::Error>> {
-        let x = tokio::task::spawn(std::future::ready(Ok(())));
-        x
-        // match self.kind {
-        //     Kind::OnDemand => tokio::task::spawn(std::future::ready(Ok(()))),
-        //     Kind::BlockingThread => {
-        //         let tx = self.tx.take().expect(MULTIPLE_STARTS_ERROR);
-        //         let plan = self.plan.clone();
-        //         tokio::task::spawn_blocking(move || {
-        //             for t in plan {
-        //                 crate::wait::spin_until(t);
-        //                 tx.blocking_send(Signal::new(t))?;
-        //             }
+    pub fn start(&mut self) -> JoinHandle<Result<()>> {
+        match self.kind {
+            Kind::OnDemand => tokio::task::spawn(std::future::ready(Ok(()))),
+            Kind::BlockingThread => {
+                let tx = self.tx.take().expect(MULTIPLE_STARTS_ERROR);
+                let plan = self.plan.clone();
+                tokio::task::spawn_blocking(move || {
+                    for t in plan {
+                        crate::wait::spin_until(t);
+                        tx.blocking_send(Signal::new(t))?;
+                    }
 
-        //             Ok(())
-        //         })
-        //     }
-        //     Kind::Cooperative => {
-        //         let tx = self.tx.take().expect(MULTIPLE_STARTS_ERROR);
-        //         let plan = self.plan.clone();
-        //         tokio::task::spawn(async move {
-        //             for t in plan {
-        //                 crate::wait::sleep_until(t).await;
-        //                 tx.send(Signal::new(t)).await?;
-        //             }
+                    Ok(())
+                })
+            }
+            Kind::Cooperative => {
+                let tx = self.tx.take().expect(MULTIPLE_STARTS_ERROR);
+                let plan = self.plan.clone();
+                tokio::task::spawn(async move {
+                    for t in plan {
+                        crate::wait::sleep_until(t).await;
+                        tx.send(Signal::new(t)).await?;
+                    }
 
-        //             Ok(())
-        //         })
-        //     }
-        // }
+                    Ok(())
+                })
+            }
+        }
     }
 
     /// Receive a waiting signal or wait until one is available.

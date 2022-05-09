@@ -4,6 +4,7 @@ mod plan;
 mod report;
 mod signaller;
 
+use anyhow::Result;
 use std::time::{Duration, Instant};
 
 use self::report::Report;
@@ -16,7 +17,7 @@ pub use self::plan::RateBlock;
 pub use self::signaller::Kind as SignallerKind;
 pub use self::signaller::Signal;
 
-pub fn run(config: &Config) -> Result<Report, anyhow::Error> {
+pub fn run(config: &Config) -> Result<Report> {
     let runtime = if let Some(worker_threads) = config.worker_threads {
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(worker_threads)
@@ -38,11 +39,7 @@ pub fn run(config: &Config) -> Result<Report, anyhow::Error> {
     tokio::spawn(async move {
         let client = hyper::Client::new();
 
-        println!("Created client");
-
         while let Some(sig) = signaller.recv().await {
-            println!("Sig: {:?}", sig.due);
-
             let client = client.clone();
             let tx = tx.clone();
             let target_uri = target_uri.clone();
@@ -50,12 +47,13 @@ pub fn run(config: &Config) -> Result<Report, anyhow::Error> {
             tokio::spawn(async move {
                 let sent = Instant::now();
 
-                // TODO Fix request
-                let req = hyper::Request::builder()
-                    .method(hyper::Method::POST)
-                    .uri("http://httpbin.org/post")
-                    .body(hyper::Body::from("Hallo!"))
-                    .expect("request builder");
+                // TODO: Use a real request
+                // let req = hyper::Request::builder()
+                //     .method(hyper::Method::POST)
+                //     .uri("http://httpbin.org/post")
+                //     .body(hyper::Body::from("Hallo!"))
+                //     .expect("request builder");
+                // let resp = client.request(req).await;
 
                 let resp = client.get(target_uri).await;
                 let done = Instant::now();
@@ -85,25 +83,19 @@ pub fn run(config: &Config) -> Result<Report, anyhow::Error> {
         let mut total_non200s = 0;
         let mut total_errors = 0;
 
-        println!("Reading responses");
-
         while let Some(r) = rx.recv().await {
             println!("Read response: {:?}", r.corrected_latency());
 
             total_responses += 1;
-            // match r.status {
-            //     Ok(status) if status != 200 => total_non200s += 1,
-            //     Ok(_) => total_200s += 1,
-            //     Err(_) => total_errors += 1,
-            // }
+            match r.status {
+                Ok(status) if status != 200 => total_non200s += 1,
+                Ok(_) => total_200s += 1,
+                Err(_) => total_errors += 1,
+            }
         }
-
-        println!("Done reading");
 
         (total_responses, total_200s, total_non200s, total_errors)
     });
-
-    dbg!((total_responses, total_200s, total_non200s, total_errors));
 
     Ok(Report {
         total_requests: 0,
@@ -113,7 +105,7 @@ pub fn run(config: &Config) -> Result<Report, anyhow::Error> {
     })
 }
 
-fn create_signaller(_config: &Config) -> Result<Signaller, anyhow::Error> {
+fn create_signaller(config: &Config) -> Result<Signaller> {
     // let plan = crate::plan::Builder::new()
     //     .ramp(from, to, over)
     //     .duration(duration)

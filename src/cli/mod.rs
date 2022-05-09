@@ -4,36 +4,19 @@ mod server;
 mod validate;
 
 use anyhow::bail;
+use anyhow::Result;
 use std::fs;
 use wrkr::Rate;
 
 use crate::load::RateBlock;
-
-// #[non_exhaustive] // See https://youtu.be/rAF8mLI0naQ?t=1375
-// #[derive(Debug, Snafu)]
-// pub enum Error {
-//     #[snafu(display("Invalid command-line invocation"))]
-//     InvalidInvocation { source: clap::error::Error },
-//     #[snafu(display("Command-line argument --{arg} is not currently supported"))]
-//     UnsupportedArgument { arg: String },
-// }
-
-// type Result<T> = std::result::Result<T, Error>;
 
 /// Parses the CLI arguments into a [`Config`][crate::config::Config] struct.
 ///
 /// This function will exit and print an appropriate help message if the
 /// supplied command-line arguments are invalid. The returned [clap::ArgMatches]
 /// is guaranteed to be valid (anything less should be considered a bug).
-pub fn parse() -> Result<crate::config::Config, anyhow::Error> {
+pub fn parse() -> Result<crate::config::Config> {
     let matches = root::command().try_get_matches()?;
-    // .context(InvalidInvocationSnafu {})?;
-
-    // We're not supporting max-rate just yet.
-    if matches.is_present("max-rate") {
-        // return UnsupportedArgumentSnafu { arg: "max-rate" }.fail();
-        bail!("Argument max-rate is not currently supported");
-    }
 
     // Construct the config based on the provided subcommand. We use `unwrap` and
     // `panic!` as if we were to encounter these it'd mean we've misconfigured clap.
@@ -110,7 +93,7 @@ fn parse_load_config(matches: &clap::ArgMatches) -> crate::config::Config {
 
     let log_level = matches.value_of_t_or_exit("log-level");
 
-    let config = crate::config::Config::Load(crate::load::Config {
+    crate::config::Config::Load(crate::load::Config {
         blocks,
         connections,
         http_method,
@@ -120,19 +103,23 @@ fn parse_load_config(matches: &clap::ArgMatches) -> crate::config::Config {
         worker_threads,
         signaller_kind,
         log_level,
-    });
-
-    config
+    })
 }
 
 fn parse_server_config(matches: &clap::ArgMatches) -> crate::config::Config {
-    // let config = crate::config::Config::Server(crate::server::Config {
-    //     port: todo!(),
-    //     worker_threads: todo!(),
-    //     log_level: todo!(),
-    // });
+    let port = matches.value_of_t_or_exit("port");
 
-    // config
+    let worker_threads = if matches.is_present("worker-threads") {
+        Some(matches.value_of_t_or_exit("worker-threads"))
+    } else {
+        None
+    };
 
-    todo!()
+    let log_level = matches.value_of_t_or_exit("log-level");
+
+    crate::config::Config::Server(crate::server::Config {
+        port,
+        worker_threads,
+        log_level,
+    })
 }
