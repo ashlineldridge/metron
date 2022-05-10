@@ -2,10 +2,10 @@ use std::str::FromStr;
 
 use anyhow::bail;
 use url::Url;
-use wrkr::LogLevel;
+use metron::LogLevel;
 
-use crate::load::RateBlock;
-use crate::load::SignallerKind;
+use crate::profile::RateBlock;
+use crate::profile::SignallerKind;
 
 #[derive(Clone, Debug)]
 pub struct Config {

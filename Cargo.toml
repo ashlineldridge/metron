@@ -1,5 +1,5 @@
 [package]
-name = "wrkr"
+name = "metron"
 authors = ["Ashlin Eldridge"]
 description = "Performance characterization tool"
 version = "0.2.0"

@@ -1,18 +1,18 @@
-use crate::cli::{load, server};
+use crate::cli::{profile, server};
 
 const ABOUT: &str = "
-wrkr is a modern performance characterization tool.
+Metron is a modern L7 performance profiler.
 
 Use --help for more details.
 
-Project home: https://github.com/ashlineldridge/wrkr
+Project home: https://github.com/ashlineldridge/metron
 ";
 
 /// Returns the root [`clap::Command`] for the application.
 pub(crate) fn command() -> clap::Command<'static> {
     use clap::*;
 
-    Command::new("wrkr")
+    Command::new("metron")
         .author(crate_authors!())
         .version(crate_version!())
         .about(ABOUT)
@@ -21,7 +21,7 @@ pub(crate) fn command() -> clap::Command<'static> {
 }
 
 fn all_subcommands() -> Vec<clap::Command<'static>> {
-    vec![load::command(), server::command()]
+    vec![profile::command(), server::command()]
         .into_iter()
         .map(|c| c.args(common_args()).groups(common_arg_groups()))
         .collect()

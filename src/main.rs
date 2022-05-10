@@ -1,12 +1,12 @@
 mod cli;
 mod config;
-mod load;
+mod profile;
 mod server;
 mod wait;
 
 use anyhow::Result;
 use config::Config;
-use wrkr::LogLevel;
+use metron::LogLevel;
 
 fn main() -> Result<()> {
     let config = crate::cli::parse()?;
@@ -15,7 +15,7 @@ fn main() -> Result<()> {
 
     match config {
         Config::Load(config) => {
-            let report = crate::load::run(&config)?;
+            let report = crate::profile::run(&config)?;
             println!("{:?}", report);
         }
         Config::Server(config) => {

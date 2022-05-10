@@ -1,7 +1,7 @@
-use wrkr::LogLevel;
+use metron::LogLevel;
 
 pub enum Config {
-    Load(crate::load::Config),
+    Load(crate::profile::Config),
     Server(crate::server::Config),
 }
 

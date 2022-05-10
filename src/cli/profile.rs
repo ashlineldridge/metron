@@ -1,21 +1,21 @@
 use crate::cli::validate::{self, validate};
 
-/// Creates the [`clap::Command`] for the `load` subcommand.
+/// Creates the [`clap::Command`] for the `profile` subcommand.
 ///
 /// # Examples
 /// ```bash
-/// wrkr load \
+/// metron profile \
 ///   --duration 20s \
 ///   --rate 100 \
 ///   https://example.com
 /// ```
 pub fn command() -> clap::Command<'static> {
-    clap::Command::new("load")
+    clap::Command::new("profile")
         .args(all_args())
         .groups(all_arg_groups())
 }
 
-/// Returns all [`clap::Arg`]s for the `load` subcommand.
+/// Returns all [`clap::Arg`]s for the `profile` subcommand.
 fn all_args() -> Vec<clap::Arg<'static>> {
     vec![
         arg_duration(),
@@ -38,7 +38,7 @@ fn all_args() -> Vec<clap::Arg<'static>> {
     ]
 }
 
-/// Returns the [`clap::ArgGroup`]s for the `load` subcommand.
+/// Returns the [`clap::ArgGroup`]s for the `profile` subcommand.
 fn all_arg_groups() -> Vec<clap::ArgGroup<'static>> {
     vec![
         arg_group_primary(),

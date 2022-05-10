@@ -1,14 +1,13 @@
-mod load;
+mod profile;
 mod root;
 mod server;
 mod validate;
 
-use anyhow::bail;
 use anyhow::Result;
 use std::fs;
-use wrkr::Rate;
+use metron::Rate;
 
-use crate::load::RateBlock;
+use crate::profile::RateBlock;
 
 /// Parses the CLI arguments into a [`Config`][crate::config::Config] struct.
 ///
@@ -22,7 +21,7 @@ pub fn parse() -> Result<crate::config::Config> {
     // `panic!` as if we were to encounter these it'd mean we've misconfigured clap.
     let subcommand = matches.subcommand().unwrap();
     let config = match subcommand {
-        ("load", matches) => parse_load_config(matches),
+        ("profile", matches) => parse_profile_config(matches),
         ("server", matches) => parse_server_config(matches),
         _ => panic!("Unknown subcommand"),
     };
@@ -30,7 +29,7 @@ pub fn parse() -> Result<crate::config::Config> {
     Ok(config)
 }
 
-fn parse_load_config(matches: &clap::ArgMatches) -> crate::config::Config {
+fn parse_profile_config(matches: &clap::ArgMatches) -> crate::config::Config {
     let mut blocks = vec![];
 
     // Add a linear ramp block if requested.
@@ -93,7 +92,7 @@ fn parse_load_config(matches: &clap::ArgMatches) -> crate::config::Config {
 
     let log_level = matches.value_of_t_or_exit("log-level");
 
-    crate::config::Config::Load(crate::load::Config {
+    crate::config::Config::Load(crate::profile::Config {
         blocks,
         connections,
         http_method,

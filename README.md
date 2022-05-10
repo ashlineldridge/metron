@@ -1,6 +1,6 @@
-# wrkr
+# Metron
 
-An OK load testing tool.
+Metron is an L7 performance profiler.
 
 ## Design
 

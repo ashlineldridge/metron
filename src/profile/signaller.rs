@@ -6,7 +6,7 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::load::plan::Plan;
+use crate::profile::plan::Plan;
 
 const BACK_PRESSURE_CHAN_SIZE: usize = 1024;
 const MULTIPLE_STARTS_ERROR: &str = "`Signaller` can only be started once";
@@ -19,7 +19,7 @@ const MULTIPLE_STARTS_ERROR: &str = "`Signaller` can only be started once";
 /// use crate::signaller::Signaller;
 ///
 /// use std::time::Duration;
-/// use wrkr::Rate;
+/// use metron::Rate;
 ///
 /// #[tokio::main]
 /// async fn main() {

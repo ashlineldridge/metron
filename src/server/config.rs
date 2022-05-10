@@ -1,4 +1,4 @@
-use wrkr::LogLevel;
+use metron::LogLevel;
 
 pub struct Config {
     pub port: u16,

@@ -4,7 +4,7 @@ use crate::cli::validate::validate;
 ///
 /// # Examples
 /// ```bash
-/// wrkr server --port 8080
+/// metron server --port 8080
 /// ```
 pub(crate) fn command() -> clap::Command<'static> {
     clap::Command::new("server")

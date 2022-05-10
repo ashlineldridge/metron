@@ -1,5 +1,5 @@
 use std::time::{Duration, Instant};
-use wrkr::Rate;
+use metron::Rate;
 
 /// Timing plan for outbound requests.
 ///
@@ -129,7 +129,7 @@ impl Iterator for Plan {
 /// # Examples
 /// ```
 /// use crate::plan::Builder;
-/// use wrkr::Rate;
+/// use metron::Rate;
 ///
 /// // Construct a plan that ramps up throughput from 10 RPS to 500 RPS over
 /// // the first 60 seconds and then maintains 500 RPS for a further 5 minutes.
