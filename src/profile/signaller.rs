@@ -110,33 +110,6 @@ impl Signaller {
         Self { kind, plan, tx, rx }
     }
 
-    /// Creates a new [on-demand][Kind::OnDemand] `Signaller`.
-    ///
-    /// # Arguments
-    ///
-    /// * `plan` - Plan used to determine request timing
-    pub fn new_on_demand(plan: Plan) -> Self {
-        Self::new(Kind::OnDemand, plan)
-    }
-
-    /// Creates a new [blocking-thread][Kind::BlockingThread] `Signaller`.
-    ///
-    /// # Arguments
-    ///
-    /// * `plan` - Plan used to determine request timing
-    pub fn new_blocking_thread(plan: Plan) -> Self {
-        Self::new(Kind::BlockingThread, plan)
-    }
-
-    /// Creates a new [cooperative][Kind::Cooperative] `Signaller`.
-    ///
-    /// # Arguments
-    ///
-    /// * `plan` - Plan used to determine request timing
-    pub fn new_cooperative(plan: Plan) -> Self {
-        Self::new(Kind::OnDemand, plan)
-    }
-
     /// Start any background processes needed to generate timing signals.
     ///
     /// This function returns a [JoinHandle] that may be used to interact with
@@ -204,12 +177,6 @@ pub struct Signal {
 impl Signal {
     fn new(due: Instant) -> Self {
         Self { due }
-    }
-
-    fn now() -> Self {
-        Self {
-            due: Instant::now(),
-        }
     }
 }
 

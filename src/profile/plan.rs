@@ -38,6 +38,7 @@ impl RateBlock {
 
 impl Plan {
     /// Resets the plan back to an unstarted state.
+    #[allow(dead_code)]
     pub fn reset(&mut self) {
         self.start = None;
         self.prev = None;

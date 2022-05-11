@@ -21,7 +21,6 @@ fn all_args() -> Vec<clap::Arg<'static>> {
         arg_duration(),
         arg_forever(),
         arg_rate(),
-        // arg_max_rate(),
         arg_ramp_duration(),
         arg_ramp_rate_start(),
         arg_ramp_rate_end(),
@@ -43,7 +42,6 @@ fn all_arg_groups() -> Vec<clap::ArgGroup<'static>> {
     vec![
         arg_group_primary(),
         arg_group_primary_duration(),
-        arg_group_primary_rate(),
         arg_group_target(),
         arg_group_ramp(),
         arg_group_payload(),
@@ -65,16 +63,6 @@ fn arg_group_primary() -> clap::ArgGroup<'static> {
 /// `--duration` or `--forever`).
 fn arg_group_primary_duration() -> clap::ArgGroup<'static> {
     clap::ArgGroup::new("group-primary-duration")
-        .multiple(false)
-        .required(true)
-}
-
-/// Returns the [`clap::ArgGroup`] for the primary rate arguments.
-///
-/// This argument group ensures that a primary rate has been set (using
-/// `--rate` or `--max-rate`).
-fn arg_group_primary_rate() -> clap::ArgGroup<'static> {
-    clap::ArgGroup::new("group-primary-rate")
         .multiple(false)
         .required(true)
 }
@@ -164,31 +152,8 @@ See https://docs.rs/humantime/latest/humantime for time format details.
 
     clap::Arg::new("rate")
         .long("rate")
-        .groups(&["group-primary", "group-primary-rate"])
+        .group("group-primary")
         .value_name("RATE")
-        .help(SHORT)
-        .long_help(LONG)
-}
-
-/// Returns the [`clap::Arg`] for `--max-rate`.
-fn arg_max_rate() -> clap::Arg<'static> {
-    const SHORT: &str = "Perform a maximum rate load test.";
-    const LONG: &str = "\
-Specifies that a maximum rate load test should be performed rather that one
-where the desired request timing can be predicted ahead of time.
-
-During a maximum rate load test there is no waiting between timing signals
-like there is for rate-based load tests. Requests will be sent to the target(s)
-as quickly as host resources allow.
-
-This argument is incompatible with --rate, --ramp-duration, --ramp-rate-start,
-and --ramp-rate-end.
-";
-
-    clap::Arg::new("max-rate")
-        .long("max-rate")
-        .groups(&["group-primary", "group-primary-rate"])
-        .conflicts_with("group-ramp")
         .help(SHORT)
         .long_help(LONG)
 }
