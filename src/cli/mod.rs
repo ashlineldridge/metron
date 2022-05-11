@@ -8,7 +8,11 @@ use std::fs;
 use anyhow::Result;
 use metron::Rate;
 
-use crate::{config, profile::RateBlock, runtime};
+use crate::{
+    config,
+    profile::{RateBlock, SignallerKind},
+    runtime,
+};
 
 /// Parses the CLI arguments into a [`Config`][config::Config] struct.
 ///
@@ -84,7 +88,13 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> config::Config {
     };
 
     let runtime = parse_runtime_config(matches);
-    let signaller_kind = matches.value_of_t_or_exit("signaller");
+
+    let signaller_kind = match matches.value_of("signaller").unwrap() {
+        "blocking" => SignallerKind::Blocking,
+        "cooperative" => SignallerKind::Cooperative,
+        s => panic!("Invalid signaller: {}", s),
+    };
+
     let log_level = matches.value_of_t_or_exit("log-level");
 
     config::Config::Load(crate::profile::Config {

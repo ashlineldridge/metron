@@ -1,7 +1,7 @@
-use std::{str::FromStr, time::Instant};
+use std::time::Instant;
 
-use anyhow::bail;
 use anyhow::Result;
+use tokio::sync::mpsc;
 use tokio::{
     sync::mpsc::{Receiver, Sender},
     task::JoinHandle,
@@ -24,32 +24,13 @@ const MULTIPLE_STARTS_ERROR: &str = "`Signaller` can only be started once";
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     // Maximal throughput plan that runs for 60 seconds.
-///     let plan = Builder::new()
-///         .duration(Duration::from_secs(60))
-///         .build()
-///         .unwrap();
+///   // 100 RPS plan that runs for 60 seconds.
+///   let plan = Builder::new()
+///       .fixed_rate_block(Rate(100), Some(Duration::from_secs(60)))
+///       .build()
+///       .unwrap();
 ///
-///     // Create an on-demand signaller that always produces the current time
-///     // when a signal is requested.
-///     let signaller = Signaller::new_on_demand(plan);
-///     let sig = signaller.recv().await.unwrap();
-///     println!("The next request should be sent at {}", sig.due);
-///
-///     // 100 RPS plan that runs for 60 seconds.
-///     let plan = Builder::new()
-///         .duration(Duration::from_secs(60))
-///         .rate(Rate(100))
-///         .build()
-///         .unwrap();
-///
-///     // Create a blocking-thread signaller that uses a dedicated thread to place
-///     // signals on a channel at the appropriate time.
-///     let signaller = Signaller::new_blocking_thread(plan);
-///     let sig = signaller.recv().await.unwrap();
-///     println!("The next request should be sent at {}", sig.due);
-///
-///     // Create a cooperative signaller that uses a dedicated task to place
+///     // Create a blocking signaller that uses a dedicated thread to place
 ///     // signals on a channel at the appropriate time.
 ///     let signaller = Signaller::new_blocking_thread(plan);
 ///     let sig = signaller.recv().await.unwrap();
@@ -73,17 +54,11 @@ pub struct Signaller {
 /// to produce timing signals.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
-    /// An `OnDemand` signaller produces timing signals when they are requested.
-    /// This type of signaller does not use a background task or thread for
-    /// producing timing signals; rather, it simply queries the supplied plan
-    /// when [`Signaller::recv`] is called.
-    OnDemand,
-
-    /// A `BlockingThread` signaller creates a dedicated thread for producing
+    /// A `Blocking` signaller creates a dedicated thread for producing
     /// timing signals. This is the most accurate signaller for interval-
     /// based timing due to the fact that it does not need to cooperate with
     /// the scheduler.
-    BlockingThread,
+    Blocking,
 
     /// A `Cooperative` signaller uses a cooperatively scheduled Tokio task
     /// to produce timing signals. This type of signaller is useful in single-
@@ -100,24 +75,24 @@ impl Signaller {
     /// * `kind` - Kind of `Signaller` to create
     /// * `plan` - Plan used to determine request timing
     pub fn new(kind: Kind, plan: Plan) -> Self {
-        let (tx, rx) = if kind == Kind::OnDemand {
-            (None, None)
-        } else {
-            let (tx, rx) = tokio::sync::mpsc::channel(BACK_PRESSURE_CHAN_SIZE);
-            (Some(tx), Some(rx))
-        };
+        let (tx, rx) = mpsc::channel(BACK_PRESSURE_CHAN_SIZE);
 
-        Self { kind, plan, tx, rx }
+        Self {
+            kind,
+            plan,
+            tx: Some(tx),
+            rx: Some(rx),
+        }
     }
 
-    /// Creates a new [blocking-thread][Kind::BlockingThread] `Signaller`.
+    /// Creates a new [blocking][Kind::Blocking] `Signaller`.
     ///
     /// # Arguments
     ///
     /// * `plan` - Plan used to determine request timing
     #[allow(dead_code)]
     pub fn new_blocking_thread(plan: Plan) -> Self {
-        Self::new(Kind::BlockingThread, plan)
+        Self::new(Kind::Blocking, plan)
     }
 
     /// Creates a new [cooperative][Kind::Cooperative] `Signaller`.
@@ -127,10 +102,10 @@ impl Signaller {
     /// * `plan` - Plan used to determine request timing
     #[allow(dead_code)]
     pub fn new_cooperative(plan: Plan) -> Self {
-        Self::new(Kind::OnDemand, plan)
+        Self::new(Kind::Cooperative, plan)
     }
 
-    /// Start any background processes needed to generate timing signals.
+    /// Start background process used to generate timing signals.
     ///
     /// This function returns a [JoinHandle] that may be used to interact with
     /// the background workload. The completion of this `JoinHandle` should only
@@ -139,32 +114,26 @@ impl Signaller {
     /// be read. To ensure all signals have been read, the client should
     /// continue to call [`recv`][Self::recv] until `None` is returned.
     pub fn start(&mut self) -> JoinHandle<Result<()>> {
+        let tx = self.tx.take().expect(MULTIPLE_STARTS_ERROR);
+        let plan = self.plan.clone();
+
         match self.kind {
-            Kind::OnDemand => tokio::task::spawn(std::future::ready(Ok(()))),
-            Kind::BlockingThread => {
-                let tx = self.tx.take().expect(MULTIPLE_STARTS_ERROR);
-                let plan = self.plan.clone();
-                tokio::task::spawn_blocking(move || {
-                    for t in plan {
-                        crate::wait::spin_until(t);
-                        tx.blocking_send(Signal::new(t))?;
-                    }
+            Kind::Blocking => tokio::task::spawn_blocking(move || {
+                for t in plan {
+                    crate::wait::spin_until(t);
+                    tx.blocking_send(Signal::new(t))?;
+                }
 
-                    Ok(())
-                })
-            }
-            Kind::Cooperative => {
-                let tx = self.tx.take().expect(MULTIPLE_STARTS_ERROR);
-                let plan = self.plan.clone();
-                tokio::task::spawn(async move {
-                    for t in plan {
-                        crate::wait::sleep_until(t).await;
-                        tx.send(Signal::new(t)).await?;
-                    }
+                Ok(())
+            }),
+            Kind::Cooperative => tokio::task::spawn(async move {
+                for t in plan {
+                    crate::wait::sleep_until(t).await;
+                    tx.send(Signal::new(t)).await?;
+                }
 
-                    Ok(())
-                })
-            }
+                Ok(())
+            }),
         }
     }
 
@@ -177,15 +146,9 @@ impl Signaller {
     ///
     /// More to come...
     pub async fn recv(&mut self) -> Option<Signal> {
-        if self.kind == Kind::OnDemand {
-            // We are doing on-demand signalling so retrieve the next instant
-            // directly from the plan rather than from the channel.
-            self.plan.next().map(Signal::new)
-        } else {
-            // Safe to unwrap since we control the lifecycle of rx.
-            let rx = self.rx.as_mut().unwrap();
-            rx.recv().await
-        }
+        // Safe to unwrap since we control the lifecycle of rx.
+        let rx = self.rx.as_mut().unwrap();
+        rx.recv().await
     }
 }
 
@@ -197,18 +160,5 @@ pub struct Signal {
 impl Signal {
     fn new(due: Instant) -> Self {
         Self { due }
-    }
-}
-
-impl FromStr for Kind {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        match s {
-            "blocking-thread" => Ok(Kind::BlockingThread),
-            "cooperative" => Ok(Kind::Cooperative),
-            "on-demand" => Ok(Kind::OnDemand),
-            _ => bail!("Invalid signaller: {}", s),
-        }
     }
 }

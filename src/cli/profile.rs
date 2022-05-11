@@ -145,8 +145,6 @@ per second.
 If a ramp is being used (see --ramp-duration and --ramp-rate-start),
 this primary request rate will kick in after the ramp is complete.
 
-Either --rate or --max-rate must be specified, but not both.
-
 See https://docs.rs/humantime/latest/humantime for time format details.
 ";
 
@@ -271,7 +269,6 @@ Sets the HTTP method to use when making requests of the target.
 If this argument is not specifed and no payload is specified (--payload or
 --payload-file) then HTTP GET will be assumed. If this argument is not specified
 and a payload is specified then HTTP POST will be assumed.
-also be specified.
 ";
 
     clap::Arg::new("http-method")
@@ -352,7 +349,7 @@ Sets the number of worker threads to be used by the runtime to COUNT.
 
 The worker threads are the set of threads that are cooperatively scheduled to
 perform the load test. This number does not include the thread allocated to the
-signaller if a blocking-thread signaller is used (see --signaller).
+signaller if a blocking signaller is used (see --signaller).
 
 This argument defaults to the number of cores on the host machine.
 ";
@@ -377,8 +374,7 @@ forces all operations to run on the main thread whereas --worker-threads=1 will
 result in the main thread creating a single worker thread to perform the
 requests.
 
-This argument is incompatible with --worker-threads and
---signaller=blocking-thread.
+This argument is incompatible with --worker-threads and --signaller=blocking.
 ";
 
     clap::Arg::new("single-threaded")
@@ -414,17 +410,13 @@ fn arg_signaller() -> clap::Arg<'static> {
 Selects the type of signalling system that should be used to generate request
 timing signals. This is an advanced feature and the default behaviour will
 generally be what you want.
-
-By default, a blocking-thread signaller will be used unless --max-rate has been
-specified, in which case an on-demand signaller is used as maximum throughput
-tests don't require timing signals.
 ";
 
     clap::Arg::new("signaller")
         .long("signaller")
         .value_name("NAME")
-        .default_value("blocking-thread")
-        .possible_values(&["blocking-thread", "on-demand", "cooperative"])
+        .default_value("blocking")
+        .possible_values(&["blocking", "cooperative"])
         .help(SHORT)
         .long_help(LONG)
 }
