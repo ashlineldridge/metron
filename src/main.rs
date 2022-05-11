@@ -26,7 +26,7 @@ fn try_main() -> Result<()> {
     match config {
         Config::Load(config) => {
             let report = profile::run(&config)?;
-            println!("{:?}", report);
+            println!("{:#?}", report);
         }
         Config::Server(config) => {
             server::run(&config)?;

@@ -7,6 +7,8 @@ mod signaller;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
+use hyper::Client;
+use hyper_tls::HttpsConnector;
 
 pub use self::client::ClientResult;
 pub use self::config::Config;
@@ -24,11 +26,15 @@ pub fn run(config: &Config) -> Result<Report> {
 
     let target_uri = config.targets[0].to_string().parse::<hyper::Uri>()?;
     let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
-    let mut signaller = create_signaller(config)?;
+    let plan = plan::Builder::new().blocks(&config.blocks).build()?;
+    let mut signaller = Signaller::new(config.signaller_kind, plan);
     signaller.start();
 
+    let sent = Instant::now();
+
     tokio::spawn(async move {
-        let client = hyper::Client::new();
+        let https = HttpsConnector::new();
+        let client = Client::builder().build::<_, hyper::Body>(https);
 
         while let Some(sig) = signaller.recv().await {
             let client = client.clone();
@@ -68,72 +74,56 @@ pub fn run(config: &Config) -> Result<Report> {
         Result::<(), anyhow::Error>::Ok(())
     });
 
-    let (total_responses, total_200s, total_non200s, total_errors) = runtime.block_on(async move {
-        let mut total_responses = 0;
+    let (
+        total_requests,
+        total_200s,
+        total_non200s,
+        total_errors,
+        avg_actual_latency,
+        avg_corrected_latency,
+    ) = runtime.block_on(async move {
+        let mut total_requests = 0;
         let mut total_200s = 0;
         let mut total_non200s = 0;
         let mut total_errors = 0;
+        let mut total_actual_latency = Duration::from_secs(0);
+        let mut total_corrected_latency = Duration::from_secs(0);
 
         while let Some(r) = rx.recv().await {
-            println!("Read response: {:?}", r.corrected_latency());
+            total_actual_latency += r.actual_latency();
+            total_corrected_latency += r.corrected_latency();
 
-            total_responses += 1;
+            total_requests += 1;
             match r.status {
                 Ok(status) if status != 200 => total_non200s += 1,
                 Ok(_) => total_200s += 1,
-                Err(_) => total_errors += 1,
+                Err(e) => {
+                    eprintln!("{}", e);
+                    total_errors += 1;
+                }
             }
         }
 
-        (total_responses, total_200s, total_non200s, total_errors)
+        (
+            total_requests as usize,
+            total_200s,
+            total_non200s,
+            total_errors,
+            total_actual_latency / total_requests,
+            total_corrected_latency / total_requests,
+        )
     });
 
+    let done = Instant::now();
+    let total_duration = done - sent;
+
     Ok(Report {
-        total_requests: 0,
-        total_errors: 0,
-        total_duration: Duration::from_secs(0),
-        avg_latency: Duration::from_secs(0),
+        total_200s,
+        total_non200s,
+        total_requests,
+        total_errors,
+        total_duration,
+        avg_actual_latency,
+        avg_corrected_latency,
     })
-}
-
-fn create_signaller(config: &Config) -> Result<Signaller> {
-    // let plan = crate::plan::Builder::new()
-    //     .ramp(from, to, over)
-    //     .duration(duration)
-    //     .rate(rate)
-    //     .build()?;
-
-    // let schedule = if let Some(ramp_duration) = config.ramp_duration {
-    //     let from = config.init_rate.context("Ramp requires an initial rate")?;
-    //     let to = config.rate.context("Ramp requires main rate")?;
-    //     let mut schedule = crate::schedule::ramped_rate(from, to, ramp_duration).boxed();
-    //     if let Some(duration) = config.duration {
-    //         let duration = ramp_duration + duration;
-    //         schedule = crate::schedule::finite(duration, schedule).boxed();
-    //     };
-
-    //     Some(schedule)
-    // } else if let Some(rate) = config.rate {
-    //     let mut schedule = crate::schedule::fixed_rate(rate).boxed();
-    //     if let Some(duration) = config.duration {
-    //         schedule = crate::schedule::finite(duration, schedule).boxed();
-    //     };
-
-    //     Some(schedule)
-    // } else {
-    //     None
-    // };
-
-    // let signaller = if let Some(schedule) = schedule {
-    //     if config.async_signaller {
-    //         crate::signaller::async_signaller(schedule).boxed()
-    //     } else {
-    //         crate::signaller::blocking_signaller(schedule).boxed()
-    //     }
-    // } else {
-    //     crate::signaller::asap_signaller(config.duration).boxed()
-    // };
-
-    // Ok(signaller)
-    todo!()
 }
