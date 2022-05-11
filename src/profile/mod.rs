@@ -4,18 +4,18 @@ mod plan;
 mod report;
 mod signaller;
 
-use anyhow::Result;
 use std::time::{Duration, Instant};
 
-use self::report::Report;
-use self::signaller::Signaller;
+use anyhow::Result;
 
 pub use self::client::ClientResult;
 pub use self::config::Config;
 pub use self::plan::Plan;
 pub use self::plan::RateBlock;
+use self::report::Report;
 pub use self::signaller::Kind as SignallerKind;
 pub use self::signaller::Signal;
+use self::signaller::Signaller;
 
 pub fn run(config: &Config) -> Result<Report> {
     let runtime = if let Some(worker_threads) = config.worker_threads {

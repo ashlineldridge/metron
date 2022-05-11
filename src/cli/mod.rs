@@ -3,8 +3,9 @@ mod root;
 mod server;
 mod validate;
 
-use anyhow::Result;
 use std::fs;
+
+use anyhow::Result;
 use metron::Rate;
 
 use crate::profile::RateBlock;

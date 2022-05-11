@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use anyhow::bail;
-use url::Url;
 use metron::LogLevel;
+use url::Url;
 
 use crate::profile::RateBlock;
 use crate::profile::SignallerKind;

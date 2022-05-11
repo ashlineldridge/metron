@@ -1,11 +1,12 @@
 mod config;
 
+use std::convert::Infallible;
+
 use anyhow::Result;
 use hyper::{
     service::{make_service_fn, service_fn},
     Body, Request, Response, Server,
 };
-use std::convert::Infallible;
 
 pub use self::config::Config;
 

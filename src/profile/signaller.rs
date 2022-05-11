@@ -1,6 +1,7 @@
+use std::{str::FromStr, time::Instant};
+
 use anyhow::bail;
 use anyhow::Result;
-use std::{str::FromStr, time::Instant};
 use tokio::{
     sync::mpsc::{Receiver, Sender},
     task::JoinHandle,

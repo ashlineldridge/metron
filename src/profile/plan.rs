@@ -1,4 +1,5 @@
 use std::time::{Duration, Instant};
+
 use metron::Rate;
 
 /// Timing plan for outbound requests.
