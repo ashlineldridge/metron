@@ -382,6 +382,7 @@ dependencies = [
  "hyper",
  "hyper-tls",
  "log",
+ "num_cpus",
  "thiserror",
  "tokio",
  "url",

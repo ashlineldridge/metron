@@ -16,19 +16,10 @@ use self::report::Report;
 pub use self::signaller::Kind as SignallerKind;
 pub use self::signaller::Signal;
 use self::signaller::Signaller;
+use crate::runtime;
 
 pub fn run(config: &Config) -> Result<Report> {
-    let runtime = if let Some(worker_threads) = config.worker_threads {
-        tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(worker_threads)
-            .enable_all()
-            .build()?
-    } else {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()?
-    };
-
+    let runtime = runtime::build(&config.runtime)?;
     let _guard = runtime.enter();
 
     let target_uri = config.targets[0].to_string().parse::<hyper::Uri>()?;

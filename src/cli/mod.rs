@@ -8,14 +8,14 @@ use std::fs;
 use anyhow::Result;
 use metron::Rate;
 
-use crate::profile::RateBlock;
+use crate::{config, profile::RateBlock, runtime};
 
-/// Parses the CLI arguments into a [`Config`][crate::config::Config] struct.
+/// Parses the CLI arguments into a [`Config`][config::Config] struct.
 ///
 /// This function will exit and print an appropriate help message if the
 /// supplied command-line arguments are invalid. The returned [clap::ArgMatches]
 /// is guaranteed to be valid (anything less should be considered a bug).
-pub fn parse() -> Result<crate::config::Config> {
+pub fn parse() -> Result<config::Config> {
     let matches = root::command().try_get_matches()?;
 
     // Construct the config based on the provided subcommand. We use `unwrap` and
@@ -30,7 +30,7 @@ pub fn parse() -> Result<crate::config::Config> {
     Ok(config)
 }
 
-fn parse_profile_config(matches: &clap::ArgMatches) -> crate::config::Config {
+fn parse_profile_config(matches: &clap::ArgMatches) -> config::Config {
     let mut blocks = vec![];
 
     // Add a linear ramp block if requested.
@@ -83,43 +83,41 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> crate::config::Config {
         None
     };
 
-    let worker_threads = if matches.is_present("worker-threads") {
-        Some(matches.value_of_t_or_exit("worker-threads"))
-    } else {
-        None
-    };
-
+    let runtime = parse_runtime_config(matches);
     let signaller_kind = matches.value_of_t_or_exit("signaller");
-
     let log_level = matches.value_of_t_or_exit("log-level");
 
-    crate::config::Config::Load(crate::profile::Config {
+    config::Config::Load(crate::profile::Config {
         blocks,
         connections,
         http_method,
         targets,
         headers,
         payload,
-        worker_threads,
+        runtime,
         signaller_kind,
         log_level,
     })
 }
 
-fn parse_server_config(matches: &clap::ArgMatches) -> crate::config::Config {
+fn parse_server_config(matches: &clap::ArgMatches) -> config::Config {
     let port = matches.value_of_t_or_exit("port");
-
-    let worker_threads = if matches.is_present("worker-threads") {
-        Some(matches.value_of_t_or_exit("worker-threads"))
-    } else {
-        None
-    };
-
+    let runtime = parse_runtime_config(matches);
     let log_level = matches.value_of_t_or_exit("log-level");
 
-    crate::config::Config::Server(crate::server::Config {
+    config::Config::Server(crate::server::Config {
         port,
-        worker_threads,
+        runtime,
         log_level,
     })
+}
+
+fn parse_runtime_config(matches: &clap::ArgMatches) -> runtime::Config {
+    let worker_threads = if matches.is_present("worker-threads") {
+        matches.value_of_t_or_exit("worker-threads")
+    } else {
+        num_cpus::get()
+    };
+
+    runtime::Config { worker_threads }
 }

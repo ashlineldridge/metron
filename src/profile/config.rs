@@ -6,6 +6,7 @@ use url::Url;
 
 use crate::profile::RateBlock;
 use crate::profile::SignallerKind;
+use crate::runtime;
 
 #[derive(Clone, Debug)]
 pub struct Config {
@@ -15,7 +16,7 @@ pub struct Config {
     pub targets: Vec<Url>,
     pub headers: Vec<Header>,
     pub payload: Option<String>,
-    pub worker_threads: Option<usize>,
+    pub runtime: runtime::Config,
     pub signaller_kind: SignallerKind,
     pub log_level: LogLevel,
 }

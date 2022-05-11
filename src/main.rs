@@ -1,6 +1,7 @@
 mod cli;
 mod config;
 mod profile;
+mod runtime;
 mod server;
 mod wait;
 
@@ -24,11 +25,11 @@ fn try_main() -> Result<()> {
 
     match config {
         Config::Load(config) => {
-            let report = crate::profile::run(&config)?;
+            let report = profile::run(&config)?;
             println!("{:?}", report);
         }
         Config::Server(config) => {
-            crate::server::run(&config)?;
+            server::run(&config)?;
         }
     }
 

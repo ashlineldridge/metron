@@ -9,19 +9,10 @@ use hyper::{
 };
 
 pub use self::config::Config;
+use crate::runtime;
 
 pub fn run(config: &Config) -> Result<()> {
-    let runtime = if let Some(worker_threads) = config.worker_threads {
-        tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(worker_threads)
-            .enable_all()
-            .build()?
-    } else {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()?
-    };
-
+    let runtime = runtime::build(&config.runtime)?;
     runtime.block_on(run_server(config))?;
 
     Ok(())
