@@ -158,6 +158,18 @@ impl Builder {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn fixed_rate_block(mut self, r: Rate, d: Option<Duration>) -> Builder {
+        self.plan.blocks.push(RateBlock::Fixed(r, d));
+        self
+    }
+
+    #[allow(dead_code)]
+    pub fn linear_rate_block(mut self, start: Rate, end: Rate, d: Duration) -> Builder {
+        self.plan.blocks.push(RateBlock::Linear(start, end, d));
+        self
+    }
+
     pub fn blocks(mut self, blocks: &[RateBlock]) -> Builder {
         for block in blocks {
             self.plan.blocks.push(block.clone());

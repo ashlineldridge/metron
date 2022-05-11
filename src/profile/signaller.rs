@@ -110,6 +110,26 @@ impl Signaller {
         Self { kind, plan, tx, rx }
     }
 
+    /// Creates a new [blocking-thread][Kind::BlockingThread] `Signaller`.
+    ///
+    /// # Arguments
+    ///
+    /// * `plan` - Plan used to determine request timing
+    #[allow(dead_code)]
+    pub fn new_blocking_thread(plan: Plan) -> Self {
+        Self::new(Kind::BlockingThread, plan)
+    }
+
+    /// Creates a new [cooperative][Kind::Cooperative] `Signaller`.
+    ///
+    /// # Arguments
+    ///
+    /// * `plan` - Plan used to determine request timing
+    #[allow(dead_code)]
+    pub fn new_cooperative(plan: Plan) -> Self {
+        Self::new(Kind::OnDemand, plan)
+    }
+
     /// Start any background processes needed to generate timing signals.
     ///
     /// This function returns a [JoinHandle] that may be used to interact with
@@ -160,7 +180,7 @@ impl Signaller {
         if self.kind == Kind::OnDemand {
             // We are doing on-demand signalling so retrieve the next instant
             // directly from the plan rather than from the channel.
-            self.plan.next().map(|t| Signal::new(t))
+            self.plan.next().map(Signal::new)
         } else {
             // Safe to unwrap since we control the lifecycle of rx.
             let rx = self.rx.as_mut().unwrap();
