@@ -12,7 +12,7 @@ use crate::runtime;
 pub struct Config {
     pub blocks: Vec<RateBlock>,
     pub connections: usize,
-    pub http_method: hyper::Method,
+    pub http_method: String,
     pub targets: Vec<Url>,
     pub headers: Vec<Header>,
     pub payload: Option<String>,

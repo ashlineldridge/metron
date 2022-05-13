@@ -13,6 +13,8 @@ use anyhow::Result;
 use config::Config;
 use metron::LogLevel;
 
+use crate::profile::Profiler;
+
 fn main() {
     if let Err(err) = try_main() {
         eprintln!("{}", err);
@@ -25,15 +27,26 @@ fn try_main() -> Result<()> {
 
     init_logging(config.log_level());
 
-    match config {
-        Config::Load(config) => {
-            let report = profile::run(&config)?;
-            println!("{:#?}", report);
+    let runtime = runtime::build(config.runtime())?;
+    let _guard = runtime.enter();
+
+    let handle = tokio::spawn(async move {
+        match config {
+            Config::Load(config) => {
+                let profiler = Profiler::new(config);
+                let mut samples = profiler.run().await?;
+                let report = samples.build_report().await?;
+                println!("{:#?}", report);
+            }
+            Config::Server(config) => {
+                server::run(&config)?;
+            }
         }
-        Config::Server(config) => {
-            server::run(&config)?;
-        }
-    }
+
+        Result::<(), anyhow::Error>::Ok(())
+    });
+
+    runtime.block_on(handle)??;
 
     Ok(())
 }
