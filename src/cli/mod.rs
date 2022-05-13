@@ -95,6 +95,8 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> config::Config {
         s => panic!("Invalid signaller: {}", s),
     };
 
+    let stop_on_error = matches.value_of_t_or_exit("stop-on-error");
+    let stop_on_non_2xx = matches.value_of_t_or_exit("stop-on-non-2xx");
     let log_level = matches.value_of_t_or_exit("log-level");
 
     config::Config::Load(crate::profile::Config {
@@ -106,6 +108,8 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> config::Config {
         payload,
         runtime,
         signaller_kind,
+        stop_on_error,
+        stop_on_non_2xx,
         log_level,
     })
 }

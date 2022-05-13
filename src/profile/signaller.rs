@@ -117,9 +117,11 @@ impl Signaller {
         let tx = self.tx.take().expect(MULTIPLE_STARTS_ERROR);
         let plan = self.plan.clone();
 
+        let start = Instant::now();
+
         match self.kind {
             Kind::Blocking => tokio::task::spawn_blocking(move || {
-                for t in plan {
+                for t in plan.ticks(start) {
                     crate::wait::spin_until(t);
                     tx.blocking_send(Signal::new(t))?;
                 }
@@ -127,7 +129,7 @@ impl Signaller {
                 Ok(())
             }),
             Kind::Cooperative => tokio::task::spawn(async move {
-                for t in plan {
+                for t in plan.ticks(start) {
                     crate::wait::sleep_until(t).await;
                     tx.send(Signal::new(t)).await?;
                 }

@@ -18,6 +18,8 @@ pub struct Config {
     pub payload: Option<String>,
     pub runtime: runtime::Config,
     pub signaller_kind: SignallerKind,
+    pub stop_on_error: bool,
+    pub stop_on_non_2xx: bool,
     pub log_level: LogLevel,
 }
 

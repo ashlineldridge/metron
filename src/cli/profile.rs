@@ -34,6 +34,8 @@ fn all_args() -> Vec<clap::Arg<'static>> {
         arg_single_threaded(),
         arg_connections(),
         arg_signaller(),
+        arg_stop_on_error(),
+        arg_stop_on_non_2xx(),
     ]
 }
 
@@ -417,6 +419,45 @@ generally be what you want.
         .value_name("NAME")
         .default_value("blocking")
         .possible_values(&["blocking", "cooperative"])
+        .help(SHORT)
+        .long_help(LONG)
+}
+
+/// Returns the [`clap::Arg`] for `--stop-on-error`.
+fn arg_stop_on_error() -> clap::Arg<'static> {
+    const SHORT: &str = "Whether to stop if on error.";
+    const LONG: &str = "\
+Sets whether the profiling operation should stop if an error is encountered.
+This setting only affects real errors (e.g., too many open files) and does not
+consider HTTP status codes.
+
+See --stop-on-http-non-2xx for setting HTTP status stopping behaviour.
+";
+
+    clap::Arg::new("stop-on-error")
+        .long("stop-on-error")
+        .value_name("BOOL")
+        .default_value("true")
+        .validator(validate::<bool>)
+        .help(SHORT)
+        .long_help(LONG)
+}
+
+/// Returns the [`clap::Arg`] for `--stop-on-non-2xx`.
+fn arg_stop_on_non_2xx() -> clap::Arg<'static> {
+    const SHORT: &str = "Whether to stop on non-2XX HTTP status.";
+    const LONG: &str = "\
+Sets whether the profiling operation should stop if a non-2XX HTTP status is
+retured.
+
+See --stop-on-error for setting error stopping behaviour.
+";
+
+    clap::Arg::new("stop-on-non-2xx")
+        .long("stop-on-non-2xx")
+        .value_name("BOOL")
+        .default_value("false")
+        .validator(validate::<bool>)
         .help(SHORT)
         .long_help(LONG)
 }

@@ -10,12 +10,6 @@ use metron::Rate;
 pub struct Plan {
     /// Plan building blocks.
     blocks: Vec<RateBlock>,
-    /// When the plan was started (none if not started).
-    start: Option<Instant>,
-    /// Previously returned instant (none if not started).
-    prev: Option<Instant>,
-    /// Cached plan duration (used for iterating).
-    duration: Option<Duration>,
 }
 
 /// Describes how request rate should be treated over a given duration.
@@ -37,30 +31,22 @@ impl RateBlock {
 }
 
 impl Plan {
-    /// Resets the plan back to an unstarted state.
-    #[allow(dead_code)]
-    pub fn reset(&mut self) {
-        self.start = None;
-        self.prev = None;
+    pub fn ticks(&self, start: Instant) -> Ticks {
+        Ticks::new(self, start)
     }
 
-    /// Gets the total duration of the plan.
+    /// Calculates the total duration of the plan.
     ///
     /// If the returned value is `None` the plan runs forever.
-    fn duration(&mut self) -> Option<Duration> {
-        if self.duration.is_none() {
-            self.duration =
-                self.blocks
-                    .iter()
-                    .fold(Some(Duration::from_secs(0)), |total, b| {
-                        match (total, b.duration()) {
-                            (Some(total), Some(d)) => Some(total + d),
-                            _ => None,
-                        }
-                    });
-        }
-
-        self.duration
+    pub fn calculate_duration(&self) -> Option<Duration> {
+        self.blocks
+            .iter()
+            .fold(Some(Duration::from_secs(0)), |total, b| {
+                match (total, b.duration()) {
+                    (Some(total), Some(d)) => Some(total + d),
+                    _ => None,
+                }
+            })
     }
 
     /// Gets the `RateBlock` that `progress` falls into.
@@ -84,20 +70,41 @@ impl Plan {
     }
 }
 
-impl Iterator for Plan {
+pub struct Ticks<'a> {
+    /// The plan.
+    plan: &'a Plan,
+    /// Cached plan duration.
+    duration: Option<Duration>,
+    /// When the plan was started.
+    start: Instant,
+    /// Previously returned instant (none if not started).
+    prev: Option<Instant>,
+}
+
+impl<'a> Ticks<'a> {
+    pub fn new(plan: &'a Plan, start: Instant) -> Self {
+        Self {
+            plan,
+            duration: plan.calculate_duration(),
+            start,
+            prev: None,
+        }
+    }
+}
+
+impl<'a> Iterator for Ticks<'a> {
     type Item = Instant;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // When did the plan start?
-        let start = *self.start.get_or_insert(Instant::now());
-
         // How far into the plan are we?
-        let progress = self.prev.unwrap_or(start) - start;
+        let progress = self.prev.unwrap_or(self.start) - self.start;
 
-        if let Some(block) = self.get_block(progress) {
+        if let Some(block) = self.plan.get_block(progress) {
             // Calculate the next value in the series.
             let next = match block {
-                RateBlock::Fixed(r, _) => self.prev.map(|t| t + r.as_interval()).unwrap_or(start),
+                RateBlock::Fixed(r, _) => {
+                    self.prev.map(|t| t + r.as_interval()).unwrap_or(self.start)
+                }
                 RateBlock::Linear(from, to, d) => {
                     let ramp_from = from.as_interval().as_secs_f32();
                     let ramp_to = to.as_interval().as_secs_f32();
@@ -108,19 +115,18 @@ impl Iterator for Plan {
                         (ramp_from - ramp_to) * (progress / ramp_duration).min(1.0);
                     let delta = Duration::from_secs_f32(ramp_from - ramp_progress_factor);
 
-                    self.prev.map(|t| t + delta).unwrap_or(start)
+                    self.prev.map(|t| t + delta).unwrap_or(self.start)
                 }
             };
 
             self.prev = Some(next);
 
-            // Check whether we've exceeded the duration.
-            match self.duration() {
-                Some(d) if next - start >= d => None,
-                _ => Some(next),
+            if let Some(d) = self.duration && next - self.start >= d {
+                None
+            } else {
+                self.prev
             }
         } else {
-            // We've finished.
             None
         }
     }
@@ -149,12 +155,7 @@ pub struct Builder {
 impl Builder {
     pub fn new() -> Self {
         Self {
-            plan: Plan {
-                blocks: vec![],
-                start: None,
-                prev: None,
-                duration: None,
-            },
+            plan: Plan { blocks: vec![] },
         }
     }
 

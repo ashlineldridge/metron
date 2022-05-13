@@ -1,3 +1,5 @@
+#![feature(let_chains)]
+
 mod cli;
 mod config;
 mod profile;
