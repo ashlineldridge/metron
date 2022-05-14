@@ -179,7 +179,7 @@ impl Builder {
         self
     }
 
-    pub fn build(&self) -> Result<Plan, anyhow::Error> {
-        Ok(self.plan.clone())
+    pub fn build(self) -> Plan {
+        self.plan
     }
 }

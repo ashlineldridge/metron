@@ -34,8 +34,7 @@ fn try_main() -> Result<()> {
         match config {
             Config::Load(config) => {
                 let profiler = Profiler::new(config);
-                let mut samples = profiler.run().await?;
-                let report = samples.build_report().await?;
+                let report = profiler.run().await?;
                 println!("{:#?}", report);
             }
             Config::Server(config) => {

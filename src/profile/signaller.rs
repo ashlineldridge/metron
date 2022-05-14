@@ -2,6 +2,7 @@ use std::time::Instant;
 
 use anyhow::Result;
 use tokio::sync::mpsc;
+use tokio::task;
 use tokio::{
     sync::mpsc::{Receiver, Sender},
     task::JoinHandle,
@@ -68,44 +69,32 @@ pub enum Kind {
 }
 
 impl Signaller {
+    /// Creates and runs a new `Signaller`.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - Kind of `Signaller` to create
+    /// * `plan` - Plan used to determine request timing
+    pub fn start(kind: Kind, plan: Plan) -> Self {
+        let mut signaller = Self::new(kind, plan);
+        signaller.spawn();
+        signaller
+    }
+
     /// Creates a new `Signaller`.
     ///
     /// # Arguments
     ///
     /// * `kind` - Kind of `Signaller` to create
     /// * `plan` - Plan used to determine request timing
-    pub fn new(kind: Kind, plan: Plan) -> Self {
+    fn new(kind: Kind, plan: Plan) -> Self {
         let (tx, rx) = mpsc::channel(BACK_PRESSURE_CHAN_SIZE);
+        let (tx, rx) = (Some(tx), Some(rx));
 
-        Self {
-            kind,
-            plan,
-            tx: Some(tx),
-            rx: Some(rx),
-        }
+        Self { kind, plan, tx, rx }
     }
 
-    /// Creates a new [blocking][Kind::Blocking] `Signaller`.
-    ///
-    /// # Arguments
-    ///
-    /// * `plan` - Plan used to determine request timing
-    #[allow(dead_code)]
-    pub fn new_blocking_thread(plan: Plan) -> Self {
-        Self::new(Kind::Blocking, plan)
-    }
-
-    /// Creates a new [cooperative][Kind::Cooperative] `Signaller`.
-    ///
-    /// # Arguments
-    ///
-    /// * `plan` - Plan used to determine request timing
-    #[allow(dead_code)]
-    pub fn new_cooperative(plan: Plan) -> Self {
-        Self::new(Kind::Cooperative, plan)
-    }
-
-    /// Start background process used to generate timing signals.
+    /// Spawns background process used to generate timing signals.
     ///
     /// This function returns a [JoinHandle] that may be used to interact with
     /// the background workload. The completion of this `JoinHandle` should only
@@ -113,14 +102,14 @@ impl Signaller {
     /// signals is complete and not that there are no more signals available to
     /// be read. To ensure all signals have been read, the client should
     /// continue to call [`recv`][Self::recv] until `None` is returned.
-    pub fn start(&mut self) -> JoinHandle<Result<()>> {
+    fn spawn(&mut self) -> JoinHandle<Result<()>> {
         let tx = self.tx.take().expect(MULTIPLE_STARTS_ERROR);
         let plan = self.plan.clone();
 
         let start = Instant::now();
 
         match self.kind {
-            Kind::Blocking => tokio::task::spawn_blocking(move || {
+            Kind::Blocking => task::spawn_blocking(move || {
                 for t in plan.ticks(start) {
                     crate::wait::spin_until(t);
                     tx.blocking_send(Signal::new(t))?;
@@ -128,7 +117,7 @@ impl Signaller {
 
                 Ok(())
             }),
-            Kind::Cooperative => tokio::task::spawn(async move {
+            Kind::Cooperative => task::spawn(async move {
                 for t in plan.ticks(start) {
                     crate::wait::sleep_until(t).await;
                     tx.send(Signal::new(t)).await?;
