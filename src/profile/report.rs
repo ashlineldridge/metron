@@ -1,40 +1,83 @@
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    time::{Duration, Instant},
+};
+
+use anyhow::Result;
+use hdrhistogram::Histogram;
+use url::Url;
 
 use super::profiler::Sample;
 
-#[derive(Debug, Default)]
+//
+const ERROR_STATUS: u16 = 0;
+
+type LatencyHistograms = HashMap<Url, HashMap<u16, (Histogram<u64>, Histogram<u64>)>>;
+
 pub struct Report {
-    pub total_200s: usize,
-    pub total_non200s: usize,
-    pub total_completed_requests: usize,
-    pub total_errors: usize,
-    pub total_duration: Duration,
-    pub total_actual_latency: Duration,
-    pub total_corrected_latency: Duration,
+    latencies: LatencyHistograms,
+    total_duration: Duration,
 }
 
-impl Report {
-    pub fn avg_actual_latency(&self) -> Duration {
-        if self.total_completed_requests > 0 {
-            self.total_actual_latency / self.total_completed_requests as u32
-        } else {
-            Duration::default()
-        }
+impl std::fmt::Debug for Report {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
     }
+}
 
-    pub fn avg_corrected_latency(&self) -> Duration {
-        if self.total_completed_requests > 0 {
-            self.total_corrected_latency / self.total_completed_requests as u32
-        } else {
-            Duration::default()
+impl Display for Report {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (target, m) in &self.latencies {
+            for (status, (actual, corrected)) in m {
+                let status = if *status == 0 {
+                    "ERROR".to_string()
+                } else {
+                    status.to_string()
+                };
+
+                f.write_fmt(format_args!(
+                    "
+Target URL:                  {}
+Status Code:                 {}
+Actual Latency (95%):        {:?}
+Actual Latency (99%):        {:?}
+Actual Latency (99.9%):      {:?}
+Actual Latency (99.99%):     {:?}
+Actual Latency (99.999%):    {:?}
+Corrected Latency (95%):     {:?}
+Corrected Latency (99%):     {:?}
+Corrected Latency (99.9%):   {:?}
+Corrected Latency (99.99%):  {:?}
+Corrected Latency (99.999%): {:?}
+Total Requests:              {}\n",
+                    target,
+                    status,
+                    Duration::from_micros(actual.value_at_quantile(0.95)),
+                    Duration::from_micros(actual.value_at_quantile(0.99)),
+                    Duration::from_micros(actual.value_at_quantile(0.999)),
+                    Duration::from_micros(actual.value_at_quantile(0.9999)),
+                    Duration::from_micros(actual.value_at_quantile(0.9999)),
+                    Duration::from_micros(corrected.value_at_quantile(0.95)),
+                    Duration::from_micros(corrected.value_at_quantile(0.99)),
+                    Duration::from_micros(corrected.value_at_quantile(0.999)),
+                    Duration::from_micros(corrected.value_at_quantile(0.9999)),
+                    Duration::from_micros(corrected.value_at_quantile(0.9999)),
+                    actual.len(),
+                ))?;
+            }
         }
+
+        f.write_fmt(format_args!("\nTotal duration: {:?}", self.total_duration))?;
+
+        Ok(())
     }
 }
 
 /// Builder used to construct a [Report].
 pub struct Builder {
-    /// The report under construction.
-    report: Report,
+    /// Latency histograms.
+    latencies: LatencyHistograms,
     /// When we started building the report.
     start: Instant,
 }
@@ -42,34 +85,41 @@ pub struct Builder {
 impl Builder {
     pub fn new() -> Self {
         Self {
-            report: Report::default(),
+            latencies: HashMap::new(),
             start: Instant::now(),
         }
     }
 
-    pub fn record(mut self, sample: &Result<Sample, hyper::Error>) -> Builder {
-        match sample {
-            Ok(sample) => {
-                self.report.total_completed_requests += 1;
-                if sample.status.is_2xx() {
-                    self.report.total_200s += 1;
-                } else {
-                    self.report.total_non200s += 1;
-                }
+    pub fn record(&mut self, sample: &Sample) -> Result<()> {
+        let status = match sample.status {
+            Ok(status) => status,
+            Err(_) => ERROR_STATUS,
+        };
 
-                self.report.total_actual_latency += sample.actual_latency();
-                self.report.total_corrected_latency += sample.corrected_latency();
-            }
-            Err(_) => {
-                self.report.total_errors += 1;
-            }
-        }
+        let (actual, corrected) = self
+            .latencies
+            .entry(sample.target.clone())
+            .or_default()
+            .entry(status)
+            .or_insert_with(|| (Self::new_histogram(), Self::new_histogram()));
 
-        self
+        let value = sample.actual_latency().as_micros().try_into()?;
+        actual.record(value)?;
+
+        let value = sample.corrected_latency().as_micros().try_into()?;
+        corrected.record(value)?;
+
+        Ok(())
     }
 
-    pub fn build(mut self) -> Report {
-        self.report.total_duration = Instant::now() - self.start;
-        self.report
+    pub fn build(self) -> Report {
+        Report {
+            latencies: self.latencies,
+            total_duration: Instant::now() - self.start,
+        }
+    }
+
+    fn new_histogram() -> Histogram<u64> {
+        Histogram::<u64>::new_with_bounds(1, 30 * 1_000_000, 3).unwrap()
     }
 }

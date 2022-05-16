@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
@@ -7,6 +6,7 @@ use hyper::Uri;
 use hyper_tls::HttpsConnector;
 use thiserror::Error;
 use tokio::sync::mpsc;
+use url::Url;
 
 use super::plan;
 use super::report;
@@ -22,7 +22,7 @@ pub struct Profiler {
 #[non_exhaustive]
 pub enum Error {
     #[error("Received unexpected HTTP status {status}")]
-    HttpResponse { status: StatusCode, report: Report },
+    HttpResponse { status: u16, report: Report },
 
     #[error("Could not perform HTTP request")]
     HttpRequest {
@@ -50,9 +50,8 @@ impl Profiler {
     }
 
     pub async fn run(&self) -> Result<Report, Error> {
-        let uris: Vec<Uri> = self
-            .config
-            .targets
+        let target_urls = self.config.targets.clone();
+        let target_uris: Vec<Uri> = target_urls
             .iter()
             .map(|uri| uri.to_string().parse::<hyper::Uri>().unwrap())
             .collect();
@@ -72,7 +71,7 @@ impl Profiler {
         tokio::spawn(async move {
             let https = HttpsConnector::new();
             let client = Client::builder().build::<_, hyper::Body>(https);
-            let mut uri_idx = 0;
+            let mut target_idx = 0;
 
             let start = Instant::now();
             let stop_at = plan.calculate_duration().map(|d| start + d);
@@ -90,8 +89,9 @@ impl Profiler {
                 }
 
                 // Round-robin through the target URIs.
-                let target_uri = uris[uri_idx].clone();
-                uri_idx = (uri_idx + 1) % uris.len();
+                let target_uri = target_uris[target_idx].clone();
+                let target_url = target_urls[target_idx].clone();
+                target_idx = (target_idx + 1) % target_uris.len();
 
                 // Clone other items that need to be moved into the spawned task below.
                 let client = client.clone();
@@ -110,10 +110,17 @@ impl Profiler {
                     let resp = client.request(req).await;
                     let done = Instant::now();
 
-                    let sample = resp.map(|resp| {
-                        let status = StatusCode(resp.status().as_u16());
-                        Sample::new(sig.due, sent, done, status)
-                    });
+                    let status = resp
+                        .map(|r| r.status().as_u16())
+                        .map_err(|e| Error::Unexpected(e.into()));
+
+                    let sample = Sample {
+                        target: target_url,
+                        due: sig.due,
+                        sent,
+                        done,
+                        status,
+                    };
 
                     tx.send(sample).await?;
 
@@ -125,35 +132,35 @@ impl Profiler {
         self.build_report(rx).await
     }
 
-    async fn drain_receiver(mut rx: mpsc::Receiver<Result<Sample, hyper::Error>>) {
+    async fn drain_receiver(mut rx: mpsc::Receiver<Sample>) {
         rx.close();
         while (rx.recv().await).is_some() {}
     }
 
-    async fn build_report(
-        &self,
-        mut rx: mpsc::Receiver<Result<Sample, hyper::Error>>,
-    ) -> Result<Report, Error> {
+    async fn build_report(&self, mut rx: mpsc::Receiver<Sample>) -> Result<Report, Error> {
         let mut report_builder = report::Builder::new();
 
         while let Some(sample) = rx.recv().await {
-            report_builder = report_builder.record(&sample);
-            match sample {
-                Ok(sample) if !sample.status.is_2xx() && self.config.stop_on_non_2xx => {
-                    Self::drain_receiver(rx).await;
-                    return Err(Error::HttpResponse {
-                        status: sample.status,
-                        report: report_builder.build(),
-                    });
-                }
-                Err(err) if self.config.stop_on_error => {
+            report_builder.record(&sample)?;
+
+            if self.config.stop_on_error {
+                if let Err(err) = sample.status {
                     Self::drain_receiver(rx).await;
                     return Err(Error::HttpRequest {
                         source: err.into(),
                         report: report_builder.build(),
                     });
                 }
-                _ => (),
+            }
+
+            if self.config.stop_on_non_2xx {
+                if let Ok(status) = sample.status && !(200..300).contains(&status) {
+                    Self::drain_receiver(rx).await;
+                    return Err(Error::HttpResponse {
+                        status,
+                        report: report_builder.build(),
+                    });
+                }
             }
         }
 
@@ -162,38 +169,15 @@ impl Profiler {
 }
 
 #[derive(Debug)]
-pub struct StatusCode(u16);
-
-impl Display for StatusCode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl StatusCode {
-    pub fn is_2xx(&self) -> bool {
-        (200..300).contains(&self.0)
-    }
-}
-
-#[derive(Debug)]
 pub struct Sample {
+    pub target: Url,
     pub due: Instant,
     pub sent: Instant,
     pub done: Instant,
-    pub status: StatusCode,
+    pub status: Result<u16, Error>,
 }
 
 impl Sample {
-    pub fn new(due: Instant, sent: Instant, done: Instant, status: StatusCode) -> Self {
-        Self {
-            due,
-            sent,
-            done,
-            status,
-        }
-    }
-
     pub fn actual_latency(&self) -> Duration {
         self.done - self.sent
     }

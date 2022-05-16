@@ -62,12 +62,7 @@ async fn run_server(config: server::Config) -> Result<()> {
 }
 
 fn print_report(report: &profile::Report) {
-    println!("{:#?}", report);
-    println!("Average actual latency: {:?}", report.avg_actual_latency());
-    println!(
-        "Average corrected latency: {:?}",
-        report.avg_corrected_latency()
-    );
+    println!("{}", report);
 }
 
 fn init_logging(level: LogLevel) {
