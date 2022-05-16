@@ -1,12 +1,15 @@
+use std::fmt::Display;
 use std::time::{Duration, Instant};
 
-use anyhow::{anyhow, Result};
+use anyhow::Context;
 use hyper::Client;
 use hyper::Uri;
 use hyper_tls::HttpsConnector;
+use thiserror::Error;
 use tokio::sync::mpsc;
 
 use super::plan;
+use super::report;
 use super::Config;
 use super::Report;
 use super::Signaller;
@@ -15,12 +18,38 @@ pub struct Profiler {
     config: Config,
 }
 
+#[derive(Error, Debug)]
+#[non_exhaustive]
+pub enum Error {
+    #[error("Received unexpected HTTP status {status}")]
+    HttpResponse { status: StatusCode, report: Report },
+
+    #[error("Could not perform HTTP request")]
+    HttpRequest {
+        source: anyhow::Error,
+        report: Report,
+    },
+
+    #[error(transparent)]
+    Unexpected(#[from] anyhow::Error),
+}
+
+impl Error {
+    pub fn partial_report(&self) -> Option<&Report> {
+        match self {
+            Error::HttpResponse { report, .. } => Some(report),
+            Error::HttpRequest { report, .. } => Some(report),
+            _ => None,
+        }
+    }
+}
+
 impl Profiler {
     pub fn new(config: Config) -> Self {
         Self { config }
     }
 
-    pub async fn run(&self) -> Result<Report> {
+    pub async fn run(&self) -> Result<Report, Error> {
         let uris: Vec<Uri> = self
             .config
             .targets
@@ -28,7 +57,12 @@ impl Profiler {
             .map(|uri| uri.to_string().parse::<hyper::Uri>().unwrap())
             .collect();
 
-        let http_method: hyper::Method = self.config.http_method.parse()?;
+        let http_method: hyper::Method = self
+            .config
+            .http_method
+            .parse()
+            .context("Invalid HTTP method")?;
+
         let payload = self.config.payload.clone().unwrap_or_default();
 
         let (tx, rx) = mpsc::channel(1024);
@@ -44,8 +78,14 @@ impl Profiler {
             let stop_at = plan.calculate_duration().map(|d| start + d);
 
             while let Some(sig) = signaller.recv().await {
-                // Stop receiving timing signals if we've hit the time limit.
+                // Quit if we've hit the time limit.
                 if let Some(stop_at) = stop_at && Instant::now() >= stop_at {
+                    break;
+                }
+
+                // Quit if the channel has closed (which implies that the receiver encountered
+                // an error condition and hung up).
+                if tx.is_closed() {
                     break;
                 }
 
@@ -59,6 +99,7 @@ impl Profiler {
                 let http_method = http_method.clone();
                 let payload = payload.clone();
 
+                // Send Result<Sample> down the channel
                 tokio::spawn(async move {
                     let req = hyper::Request::builder()
                         .method(http_method)
@@ -69,12 +110,11 @@ impl Profiler {
                     let resp = client.request(req).await;
                     let done = Instant::now();
 
-                    let status = resp
-                        .as_ref()
-                        .map(|r| r.status().as_u16())
-                        .map_err(|e| e.to_string());
+                    let sample = resp.map(|resp| {
+                        let status = StatusCode(resp.status().as_u16());
+                        Sample::new(sig.due, sent, done, status)
+                    });
 
-                    let sample = Sample::new(sig.due, sent, done, status);
                     tx.send(sample).await?;
 
                     Result::<(), anyhow::Error>::Ok(())
@@ -85,68 +125,67 @@ impl Profiler {
         self.build_report(rx).await
     }
 
-    async fn build_report(&self, mut rx: mpsc::Receiver<Sample>) -> Result<Report> {
-        let mut total_requests = 0;
-        let mut total_200s = 0;
-        let mut total_non200s = 0;
-        let mut total_errors = 0;
-        let mut total_actual_latency = Duration::from_secs(0);
-        let mut total_corrected_latency = Duration::from_secs(0);
+    async fn drain_receiver(mut rx: mpsc::Receiver<Result<Sample, hyper::Error>>) {
+        rx.close();
+        while (rx.recv().await).is_some() {}
+    }
 
-        let start = Instant::now();
+    async fn build_report(
+        &self,
+        mut rx: mpsc::Receiver<Result<Sample, hyper::Error>>,
+    ) -> Result<Report, Error> {
+        let mut report_builder = report::Builder::new();
 
-        while let Some(r) = rx.recv().await {
-            total_actual_latency += r.actual_latency();
-            total_corrected_latency += r.corrected_latency();
-            total_requests += 1;
-            match r.status {
-                Ok(status) if (200..300).contains(&status) => {
-                    total_200s += 1;
+        while let Some(sample) = rx.recv().await {
+            report_builder = report_builder.record(&sample);
+            match sample {
+                Ok(sample) if !sample.status.is_2xx() && self.config.stop_on_non_2xx => {
+                    Self::drain_receiver(rx).await;
+                    return Err(Error::HttpResponse {
+                        status: sample.status,
+                        report: report_builder.build(),
+                    });
                 }
-                Ok(status) => {
-                    total_non200s += 1;
-                    if self.config.stop_on_non_2xx {
-                        return Err(anyhow!("Received status: {}", status));
-                    }
+                Err(err) if self.config.stop_on_error => {
+                    Self::drain_receiver(rx).await;
+                    return Err(Error::HttpRequest {
+                        source: err.into(),
+                        report: report_builder.build(),
+                    });
                 }
-                Err(err) => {
-                    total_errors += 1;
-                    if self.config.stop_on_error {
-                        return Err(anyhow!("Received error: {}", err));
-                    }
-                }
+                _ => (),
             }
         }
 
-        let total_duration = Instant::now() - start;
-        let avg_actual_latency = total_actual_latency / total_requests as u32;
-        let avg_corrected_latency = total_corrected_latency / total_requests as u32;
-
-        Ok(Report {
-            total_200s,
-            total_non200s,
-            total_requests,
-            total_errors,
-            total_duration,
-            avg_actual_latency,
-            avg_corrected_latency,
-        })
+        Ok(report_builder.build())
     }
 }
 
-pub type StatusCode = u16;
-pub type Status = std::result::Result<StatusCode, String>;
+#[derive(Debug)]
+pub struct StatusCode(u16);
+
+impl Display for StatusCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl StatusCode {
+    pub fn is_2xx(&self) -> bool {
+        (200..300).contains(&self.0)
+    }
+}
 
 #[derive(Debug)]
-struct Sample {
-    due: Instant,
-    sent: Instant,
-    done: Instant,
-    status: Status,
+pub struct Sample {
+    pub due: Instant,
+    pub sent: Instant,
+    pub done: Instant,
+    pub status: StatusCode,
 }
 
 impl Sample {
-    pub fn new(due: Instant, sent: Instant, done: Instant, status: Status) -> Self {
+    pub fn new(due: Instant, sent: Instant, done: Instant, status: StatusCode) -> Self {
         Self {
             due,
             sent,

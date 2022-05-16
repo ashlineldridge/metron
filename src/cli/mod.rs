@@ -99,7 +99,7 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> config::Config {
     let stop_on_non_2xx = matches.value_of_t_or_exit("stop-on-non-2xx");
     let log_level = matches.value_of_t_or_exit("log-level");
 
-    config::Config::Load(crate::profile::Config {
+    config::Config::Profile(crate::profile::Config {
         blocks,
         connections,
         http_method,
