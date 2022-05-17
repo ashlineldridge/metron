@@ -185,4 +185,8 @@ impl Sample {
     pub fn corrected_latency(&self) -> Duration {
         self.done - self.due
     }
+
+    pub fn client_latency(&self) -> Duration {
+        self.sent - self.due
+    }
 }
