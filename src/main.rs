@@ -7,19 +7,20 @@ mod runtime;
 mod server;
 mod wait;
 
-use std::process;
-
-use anyhow::Result;
+use anyhow::{Context, Result};
 use config::Config;
 use metron::LogLevel;
 
 use crate::profile::Profiler;
 
-fn main() {
-    if let Err(err) = try_main() {
-        eprintln!("{}", err);
-        process::exit(2);
-    }
+fn main() -> Result<()> {
+    // For now, just let the anyhow hook print the errors.
+    // The error printing commented out below doesn't print the error chain.
+    // if let Err(err) = try_main() {
+    //     eprintln!("{}", err);
+    //     process::exit(2);
+    // }
+    try_main()
 }
 
 fn try_main() -> Result<()> {
@@ -54,7 +55,9 @@ async fn run_profile(config: profile::Config) -> Result<()> {
         }
     }
 
-    report.map(|_| ()).map_err(|err| err.into())
+    report
+        .map(|_| ())
+        .context("Profiling operation was aborted due to error")
 }
 
 async fn run_server(config: server::Config) -> Result<()> {
@@ -62,7 +65,7 @@ async fn run_server(config: server::Config) -> Result<()> {
 }
 
 fn print_report(report: &profile::Report) {
-    println!("{}", report);
+    println!("{}\n", report);
 }
 
 fn init_logging(level: LogLevel) {

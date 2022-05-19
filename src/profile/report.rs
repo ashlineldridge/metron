@@ -13,6 +13,30 @@ use super::profiler::Sample;
 // Then we can have differerent printers/serializers
 // And the builder/recorder can hold the histograms
 
+pub struct Report2 {
+    pub response_latency: Option<ReportSection>,
+    pub response_latency_corrected: Option<ReportSection>,
+    pub error_latency: Option<ReportSection>,
+    pub error_latency_corrected: Option<ReportSection>,
+    pub request_delay: Option<ReportSection>,
+    pub total_requests: usize,
+    pub total_duration: Duration,
+}
+
+#[derive(Clone, Debug)]
+pub struct ReportSection {
+    pub target: Option<Url>,
+    pub status_code: Option<u16>,
+    pub percentiles: Vec<ReportPercentile>,
+    pub total_requests: usize,
+}
+
+#[derive(Clone, Debug)]
+pub struct ReportPercentile {
+    pub percentile: f64,
+    pub duration: Duration,
+}
+
 type Histogram = hdrhistogram::Histogram<u64>;
 
 #[derive(Clone, Default)]
@@ -23,13 +47,13 @@ pub struct Report {
     /// duration between when a request _should_ have been sent and when it was received.
     response_histograms: HashMap<Url, HashMap<u16, (Histogram, Histogram)>>,
 
-    /// Client latency histograms keyed by target URL. These histograms track the latency as
-    /// measured between when a request was sent and when it should have been sent (i.e., when the
-    /// request latency increases it means that we cannot keep up with the desired request rate).
-    client_histograms: HashMap<Url, Histogram>,
-
     /// Error latency histograms keyed by target URL. Values are tuples of `(actual, corrected)`.
     error_histograms: HashMap<Url, (Histogram, Histogram)>,
+
+    /// Request delay histograms keyed by target URL. These histograms track the delay period
+    /// between when a request should have been sent and when it was sent (i.e., when the delay
+    /// increases it means that we cannot keep up with the desired request rate).
+    delay_histograms: HashMap<Url, Histogram>,
 
     /// Total duration of profiling operation.
     total_duration: Duration,
@@ -73,7 +97,7 @@ Total Requests:              {}\n",
                     Duration::from_micros(corrected.value_at_quantile(0.99)),
                     Duration::from_micros(corrected.value_at_quantile(0.999)),
                     Duration::from_micros(corrected.value_at_quantile(0.9999)),
-                    Duration::from_micros(corrected.value_at_quantile(0.9999)),
+                    Duration::from_micros(corrected.value_at_quantile(0.99999)),
                     actual.len(),
                 ))?;
             }
@@ -106,29 +130,29 @@ Total Requests:              {}\n",
                 Duration::from_micros(corrected.value_at_quantile(0.99)),
                 Duration::from_micros(corrected.value_at_quantile(0.999)),
                 Duration::from_micros(corrected.value_at_quantile(0.9999)),
-                Duration::from_micros(corrected.value_at_quantile(0.9999)),
+                Duration::from_micros(corrected.value_at_quantile(0.99999)),
                 actual.len(),
             ))?;
         }
 
-        for (target, hist) in &self.client_histograms {
+        for (target, hist) in &self.delay_histograms {
             f.write_fmt(format_args!(
                 "
-Request Latency
----------------
+Request Delay
+-------------
 Target URL:                  {}
-Latency (95%):               {:?}
-Latency (99%):               {:?}
-Latency (99.9%):             {:?}
-Latency (99.99%):            {:?}
-Latency (99.999%):           {:?}
+Delay (95%):                 {:?}
+Delay (99%):                 {:?}
+Delay (99.9%):               {:?}
+Delay (99.99%):              {:?}
+Delay (99.999%):             {:?}
 Total Requests:              {}\n",
                 target,
                 Duration::from_micros(hist.value_at_quantile(0.95)),
                 Duration::from_micros(hist.value_at_quantile(0.99)),
                 Duration::from_micros(hist.value_at_quantile(0.999)),
                 Duration::from_micros(hist.value_at_quantile(0.9999)),
-                Duration::from_micros(hist.value_at_quantile(0.9999)),
+                Duration::from_micros(hist.value_at_quantile(0.99999)),
                 hist.len(),
             ))?;
         }
@@ -156,39 +180,33 @@ impl Builder {
     }
 
     pub fn record(&mut self, sample: &Sample) -> Result<()> {
-        let actual_latency = sample.actual_latency().as_micros().try_into()?;
-        let corrected_latency = sample.corrected_latency().as_micros().try_into()?;
-        let client_latency = sample.client_latency().as_micros().try_into()?;
-
-        if let Ok(status) = sample.status {
-            let (actual_histogram, corrected_histogram) = self
-                .report
+        let (actual_histogram, corrected_histogram) = if let Ok(status) = sample.status {
+            self.report
                 .response_histograms
                 .entry(sample.target.clone())
                 .or_default()
                 .entry(status)
-                .or_insert_with(|| (Self::new_histogram(), Self::new_histogram()));
-
-            actual_histogram.record(actual_latency)?;
-            corrected_histogram.record(corrected_latency)?;
+                .or_insert_with(|| (Self::new_histogram(), Self::new_histogram()))
         } else {
-            let (actual_histogram, corrected_histogram) = self
-                .report
+            self.report
                 .error_histograms
                 .entry(sample.target.clone())
-                .or_insert_with(|| (Self::new_histogram(), Self::new_histogram()));
+                .or_insert_with(|| (Self::new_histogram(), Self::new_histogram()))
+        };
 
-            actual_histogram.record(actual_latency)?;
-            corrected_histogram.record(corrected_latency)?;
-        }
+        let actual_latency = sample.actual_latency().as_micros().try_into()?;
+        let corrected_latency = sample.corrected_latency().as_micros().try_into()?;
+        actual_histogram.record(actual_latency)?;
+        corrected_histogram.record(corrected_latency)?;
 
-        let client_histogram = self
+        let delay_histogram = self
             .report
-            .client_histograms
+            .delay_histograms
             .entry(sample.target.clone())
             .or_insert_with(Self::new_histogram);
 
-        client_histogram.record(client_latency)?;
+        let delay = sample.client_latency().as_micros().try_into()?;
+        delay_histogram.record(delay)?;
 
         Ok(())
     }
