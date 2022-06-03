@@ -1,4 +1,5 @@
 mod config;
+mod metrics;
 mod plan;
 mod profiler;
 mod report;

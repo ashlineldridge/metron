@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    fmt::Display,
     time::{Duration, Instant},
 };
 
@@ -9,13 +8,12 @@ use url::Url;
 
 use super::profiler::Sample;
 
-// TODO: Probably the report should be a simple datastructure
-// Then we can have differerent printers/serializers
-// And the builder/recorder can hold the histograms
-
-pub struct Report2 {
-    pub response_latency: Option<ReportSection>,
-    pub response_latency_corrected: Option<ReportSection>,
+#[derive(Clone, Debug, Default)]
+pub struct Report {
+    pub response_latency: Vec<ReportSection>,
+    pub response_latency_corrected: Vec<ReportSection>,
+    pub response_latency_combined: Option<ReportSection>,
+    pub response_latency_combined_corrected: Option<ReportSection>,
     pub error_latency: Option<ReportSection>,
     pub error_latency_corrected: Option<ReportSection>,
     pub request_delay: Option<ReportSection>,
@@ -39,8 +37,11 @@ pub struct ReportPercentile {
 
 type Histogram = hdrhistogram::Histogram<u64>;
 
-#[derive(Clone, Default)]
-pub struct Report {
+/// Builder used to construct a [Report].
+pub struct Builder {
+    /// When we started building the report.
+    _start: Instant,
+
     /// Response latency histograms keyed by target URL, then by HTTP status. The values are
     /// tuples of `(actual, corrected)` where "actual" measures the duration between when a
     /// request was sent and when the response was received, and "corrected" measures the
@@ -54,142 +55,27 @@ pub struct Report {
     /// between when a request should have been sent and when it was sent (i.e., when the delay
     /// increases it means that we cannot keep up with the desired request rate).
     delay_histograms: HashMap<Url, Histogram>,
-
-    /// Total duration of profiling operation.
-    total_duration: Duration,
-}
-
-impl std::fmt::Debug for Report {
-    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
-    }
-}
-
-impl Display for Report {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (target, m) in &self.response_histograms {
-            for (status, (actual, corrected)) in m {
-                f.write_fmt(format_args!(
-                    "
-Response Latency
-----------------
-Target URL:                  {}
-Status Code:                 {}
-Actual Latency (95%):        {:?}
-Actual Latency (99%):        {:?}
-Actual Latency (99.9%):      {:?}
-Actual Latency (99.99%):     {:?}
-Actual Latency (99.999%):    {:?}
-Corrected Latency (95%):     {:?}
-Corrected Latency (99%):     {:?}
-Corrected Latency (99.9%):   {:?}
-Corrected Latency (99.99%):  {:?}
-Corrected Latency (99.999%): {:?}
-Total Requests:              {}\n",
-                    target,
-                    status,
-                    Duration::from_micros(actual.value_at_quantile(0.95)),
-                    Duration::from_micros(actual.value_at_quantile(0.99)),
-                    Duration::from_micros(actual.value_at_quantile(0.999)),
-                    Duration::from_micros(actual.value_at_quantile(0.9999)),
-                    Duration::from_micros(actual.value_at_quantile(0.9999)),
-                    Duration::from_micros(corrected.value_at_quantile(0.95)),
-                    Duration::from_micros(corrected.value_at_quantile(0.99)),
-                    Duration::from_micros(corrected.value_at_quantile(0.999)),
-                    Duration::from_micros(corrected.value_at_quantile(0.9999)),
-                    Duration::from_micros(corrected.value_at_quantile(0.99999)),
-                    actual.len(),
-                ))?;
-            }
-        }
-
-        for (target, (actual, corrected)) in &self.error_histograms {
-            f.write_fmt(format_args!(
-                "
-Error Latency
--------------
-Target URL:                  {}
-Actual Latency (95%):        {:?}
-Actual Latency (99%):        {:?}
-Actual Latency (99.9%):      {:?}
-Actual Latency (99.99%):     {:?}
-Actual Latency (99.999%):    {:?}
-Corrected Latency (95%):     {:?}
-Corrected Latency (99%):     {:?}
-Corrected Latency (99.9%):   {:?}
-Corrected Latency (99.99%):  {:?}
-Corrected Latency (99.999%): {:?}
-Total Requests:              {}\n",
-                target,
-                Duration::from_micros(actual.value_at_quantile(0.95)),
-                Duration::from_micros(actual.value_at_quantile(0.99)),
-                Duration::from_micros(actual.value_at_quantile(0.999)),
-                Duration::from_micros(actual.value_at_quantile(0.9999)),
-                Duration::from_micros(actual.value_at_quantile(0.9999)),
-                Duration::from_micros(corrected.value_at_quantile(0.95)),
-                Duration::from_micros(corrected.value_at_quantile(0.99)),
-                Duration::from_micros(corrected.value_at_quantile(0.999)),
-                Duration::from_micros(corrected.value_at_quantile(0.9999)),
-                Duration::from_micros(corrected.value_at_quantile(0.99999)),
-                actual.len(),
-            ))?;
-        }
-
-        for (target, hist) in &self.delay_histograms {
-            f.write_fmt(format_args!(
-                "
-Request Delay
--------------
-Target URL:                  {}
-Delay (95%):                 {:?}
-Delay (99%):                 {:?}
-Delay (99.9%):               {:?}
-Delay (99.99%):              {:?}
-Delay (99.999%):             {:?}
-Total Requests:              {}\n",
-                target,
-                Duration::from_micros(hist.value_at_quantile(0.95)),
-                Duration::from_micros(hist.value_at_quantile(0.99)),
-                Duration::from_micros(hist.value_at_quantile(0.999)),
-                Duration::from_micros(hist.value_at_quantile(0.9999)),
-                Duration::from_micros(hist.value_at_quantile(0.99999)),
-                hist.len(),
-            ))?;
-        }
-
-        f.write_fmt(format_args!("\nTotal duration: {:?}", self.total_duration))?;
-
-        Ok(())
-    }
-}
-
-/// Builder used to construct a [Report].
-pub struct Builder {
-    /// Report under construction.
-    report: Report,
-    /// When we started building the report.
-    start: Instant,
 }
 
 impl Builder {
     pub fn new() -> Self {
         Self {
-            report: Report::default(),
-            start: Instant::now(),
+            _start: Instant::now(),
+            response_histograms: HashMap::new(),
+            error_histograms: HashMap::new(),
+            delay_histograms: HashMap::new(),
         }
     }
 
     pub fn record(&mut self, sample: &Sample) -> Result<()> {
         let (actual_histogram, corrected_histogram) = if let Ok(status) = sample.status {
-            self.report
-                .response_histograms
+            self.response_histograms
                 .entry(sample.target.clone())
                 .or_default()
                 .entry(status)
                 .or_insert_with(|| (Self::new_histogram(), Self::new_histogram()))
         } else {
-            self.report
-                .error_histograms
+            self.error_histograms
                 .entry(sample.target.clone())
                 .or_insert_with(|| (Self::new_histogram(), Self::new_histogram()))
         };
@@ -200,7 +86,6 @@ impl Builder {
         corrected_histogram.record(corrected_latency)?;
 
         let delay_histogram = self
-            .report
             .delay_histograms
             .entry(sample.target.clone())
             .or_insert_with(Self::new_histogram);
@@ -211,9 +96,19 @@ impl Builder {
         Ok(())
     }
 
-    pub fn build(mut self) -> Report {
-        self.report.total_duration = Instant::now() - self.start;
-        self.report
+    pub fn build(self) -> Report {
+        // let total_duration = Instant::now() - self.start;
+        // let report = Report {
+        //     response_latency: self.response_histograms,
+        //     response_latency_corrected: todo!(),
+        //     error_latency: todo!(),
+        //     error_latency_corrected: todo!(),
+        //     request_delay: todo!(),
+        //     total_requests: todo!(),
+        //     total_duration,
+        // };
+        // self.report
+        Report::default()
     }
 
     fn new_histogram() -> Histogram {

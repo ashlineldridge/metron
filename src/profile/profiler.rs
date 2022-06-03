@@ -8,6 +8,7 @@ use thiserror::Error;
 use tokio::sync::mpsc;
 use url::Url;
 
+use super::metrics;
 use super::plan;
 use super::report;
 use super::Config;
@@ -140,7 +141,9 @@ impl Profiler {
     async fn build_report(&self, mut rx: mpsc::Receiver<Sample>) -> Result<Report, Error> {
         let mut report_builder = report::Builder::new();
 
+        let mut backend = metrics::Backend {};
         while let Some(sample) = rx.recv().await {
+            backend.record(&sample).await?;
             report_builder.record(&sample)?;
 
             if self.config.stop_on_error {

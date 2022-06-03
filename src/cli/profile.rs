@@ -10,7 +10,16 @@ use crate::cli::validate::{self, validate};
 ///   https://example.com
 /// ```
 pub fn command() -> clap::Command<'static> {
+    const SHORT: &str = "Runs a performance profile test.";
+    const LONG: &str = "\
+Runs a performance test against the specified target(s) and produces a report.
+
+The report can be written to stdout and/or streamed to a metrics backend.
+";
+
     clap::Command::new("profile")
+        .about(SHORT)
+        .long_about(LONG)
         .args(all_args())
         .groups(all_arg_groups())
 }
@@ -18,6 +27,7 @@ pub fn command() -> clap::Command<'static> {
 /// Returns all [`clap::Arg`]s for the `profile` subcommand.
 fn all_args() -> Vec<clap::Arg<'static>> {
     vec![
+        arg_log_level(),
         arg_duration(),
         arg_forever(),
         arg_rate(),
@@ -92,6 +102,23 @@ fn arg_group_ramp() -> clap::ArgGroup<'static> {
 /// This argument group ensures that only one payload argument is specified.
 fn arg_group_payload() -> clap::ArgGroup<'static> {
     clap::ArgGroup::new("group-payload").multiple(false)
+}
+
+/// Returns the [`clap::Arg`] for `--log-level`.
+fn arg_log_level() -> clap::Arg<'static> {
+    const SHORT: &str = "Minimum logging level.";
+    const LONG: &str = "\
+Sets the minimum logging level. Log messages at or above the specified
+severity level will be printed.
+";
+
+    clap::Arg::new("log-level")
+        .long("log-level")
+        .value_name("LEVEL")
+        .default_value("off")
+        .possible_values(&["off", "trace", "debug", "info", "warn", "error"])
+        .help(SHORT)
+        .long_help(LONG)
 }
 
 /// Returns the [`clap::Arg`] for `--duration`.

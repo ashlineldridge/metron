@@ -7,9 +7,50 @@ use crate::cli::validate::validate;
 /// metron server --port 8080
 /// ```
 pub(crate) fn command() -> clap::Command<'static> {
+    const SHORT: &str = "Runs an echo server.";
+    const LONG: &str = "\
+Runs an echo server that may be used within performance profile tests.
+
+This command starts a echo server that may be configured in terms of its
+responses, latency, and other properties.
+";
+
     clap::Command::new("server")
-        .arg(arg_port())
-        .arg(arg_worker_threads())
+        .about(SHORT)
+        .long_about(LONG)
+        .args(all_args())
+        .groups(all_arg_groups())
+}
+
+/// Returns all [`clap::Arg`]s for the `server` subcommand.
+fn all_args() -> Vec<clap::Arg<'static>> {
+    vec![
+        arg_log_level(),
+        arg_port(),
+        arg_worker_threads(),
+    ]
+}
+
+/// Returns the [`clap::ArgGroup`]s for the `server` subcommand.
+fn all_arg_groups() -> Vec<clap::ArgGroup<'static>> {
+    vec![]
+}
+
+/// Returns the [`clap::Arg`] for `--log-level`.
+fn arg_log_level() -> clap::Arg<'static> {
+    const SHORT: &str = "Minimum logging level.";
+    const LONG: &str = "\
+Sets the minimum logging level. Log messages at or above the specified
+severity level will be printed.
+";
+
+    clap::Arg::new("log-level")
+        .long("log-level")
+        .value_name("LEVEL")
+        .default_value("info")
+        .possible_values(&["off", "trace", "debug", "info", "warn", "error"])
+        .help(SHORT)
+        .long_help(LONG)
 }
 
 /// Returns the [`clap::Arg`] for `--port`.

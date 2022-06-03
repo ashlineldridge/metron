@@ -29,28 +29,10 @@ fn all_subcommands() -> Vec<clap::Command<'static>> {
 
 /// Returns all [`clap::Arg`]s for the root command.
 fn common_args() -> Vec<clap::Arg<'static>> {
-    vec![arg_log_level()]
+    vec![]
 }
 
 /// Returns the [`clap::ArgGroup`]s for the root command.
 fn common_arg_groups() -> Vec<clap::ArgGroup<'static>> {
     vec![]
-}
-
-/// Returns the [`clap::Arg`] for `--log-level`.
-fn arg_log_level() -> clap::Arg<'static> {
-    const SHORT: &str = "Logging verbosity.";
-    const LONG: &str = "\
-Sets the logging verbosity level.
-
-TODO: Elaborate.
-";
-
-    clap::Arg::new("log-level")
-        .long("log-level")
-        .value_name("LEVEL")
-        .default_value("off")
-        .possible_values(&["off", "trace", "debug", "info", "warn", "error"])
-        .help(SHORT)
-        .long_help(LONG)
 }
