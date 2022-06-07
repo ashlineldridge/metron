@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use anyhow::Result;
+use serde::Deserialize;
 use tokio::sync::mpsc;
 use tokio::task;
 use tokio::{
@@ -53,7 +54,7 @@ pub struct Signaller {
 ///
 /// The signaller kind dictates the concurrency model that the signaller uses
 /// to produce timing signals.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
 pub enum Kind {
     /// A `Blocking` signaller creates a dedicated thread for producing
     /// timing signals. This is the most accurate signaller for interval-

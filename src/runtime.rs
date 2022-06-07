@@ -1,7 +1,8 @@
 use anyhow::{Context, Result};
+use serde::Deserialize;
 use tokio::runtime;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct Config {
     pub worker_threads: usize,
 }

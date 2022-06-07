@@ -1,15 +1,23 @@
 use std::time::{Duration, Instant};
 
 use metron::Rate;
+use serde::{Deserialize, Serialize, ser::SerializeStruct, de::Visitor};
+use serde::de;
 
 /// Timing plan for outbound requests.
 ///
 /// The plan dictates when requests should be sent should be sent to the
 /// test target.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Plan {
     /// Plan building blocks.
     blocks: Vec<RateBlock>,
+}
+
+impl Plan {
+    pub fn new(blocks: Vec<RateBlock>) -> Self {
+        Self { blocks }
+    }
 }
 
 /// Describes how request rate should be treated over a given duration.
@@ -27,6 +35,80 @@ impl RateBlock {
             RateBlock::Fixed(_, d) => *d,
             RateBlock::Linear(_, _, d) => Some(*d),
         }
+    }
+}
+
+impl Serialize for RateBlock {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            RateBlock::Fixed(r, d) => {
+                let mut state = serializer.serialize_struct("RateBlock", 2)?;
+                state.serialize_field("rate", &r.0)?;
+                state.serialize_field("duration", d)?;
+                state.end()
+            }
+            RateBlock::Linear(r1, r2, d) => {
+                let mut state = serializer.serialize_struct("RateBlock", 3)?;
+                state.serialize_field("rate_from", &r1.0)?;
+                state.serialize_field("rate_to", &r2.0)?;
+                state.serialize_field("duration", d)?;
+                state.end()
+            }
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for RateBlock {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &["kind", "rate", "rate_from", "rate_to", "duration"];
+
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "lowercase")]
+        enum Kind { Fixed, Linear }
+
+        struct RateBlockVisitor;
+        impl<'de> Visitor<'de> for RateBlockVisitor {
+            type Value = RateBlock;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("enum RateBlock")
+            }
+
+            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>, {
+                let mut kind = None;
+                let mut rate1 = None;
+                let mut rate2 = None;
+                let mut duration = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        "kind" => {
+                            if kind.is_some() {
+                                return Err(de::Error::duplicate_field("kind"));
+                            } else {
+                                kind = Some(map.next_value()?);
+                            }
+                        }
+                        _ => return Err(de::Error::unknown_field(key, FIELDS)),
+                    }
+                }
+
+                match kind {
+                    Some(Kind::Fixed) => todo!(),
+                    Some(Kind::Linear) => todo!(),
+                    None => Err(de::Error::missing_field("kind"))
+                }
+            }
+        }
+
+        deserializer.deserialize_struct("RateBlock", FIELDS, RateBlockVisitor)
     }
 }
 

@@ -1,6 +1,9 @@
 use std::{ops::Deref, str::FromStr, time::Duration};
 
-#[derive(Clone, Copy)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Clone, Copy, Deserialize, Serialize)]
+#[serde(transparent)]
 pub struct Rate(pub u32);
 
 impl Rate {

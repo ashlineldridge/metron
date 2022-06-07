@@ -18,8 +18,10 @@ log = "0.4.17"
 metrics = "0.19.0"
 metrics-exporter-prometheus = "0.10.0"
 num_cpus = "1.13.1"
+serde = { version = "1.0.137", features = ["derive"] }
+serde_yaml = "0.8.24"
 thiserror = "1.0.31"
-tokio = { version = "1.18.2", features = ["full"] }
+tokio = { version = "1.19.1", features = ["full"] }
 tower = { version = "0.4.12", features = ["full"] }
 tower-http = "0.3.3"
 url = "2.2.2"

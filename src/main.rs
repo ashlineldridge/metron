@@ -14,6 +14,14 @@ use metron::LogLevel;
 use crate::profile::Profiler;
 
 fn main() -> Result<()> {
+    let blocks = vec![profile::RateBlock::Fixed(metron::Rate(10), Some(std::time::Duration::from_secs(4))), profile::RateBlock::Linear(metron::Rate(50), metron::Rate(100), std::time::Duration::from_secs(5))];
+    let plan = profile::Plan::new(blocks);
+    let yaml = serde_yaml::to_string(&plan)?;
+    // let s = std::ffi::OsString::from("Hello Ashlin");
+    // let yaml = serde_yaml::to_string(&s)?;
+
+    println!("{}", yaml);
+
     // TODO: Fix: This is exiting with an error if you run --help.
     // For now, just let the anyhow hook print the errors.
     // The error printing commented out below doesn't print the error chain.
