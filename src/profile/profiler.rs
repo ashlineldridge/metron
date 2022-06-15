@@ -1,19 +1,13 @@
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
-use hyper::Client;
-use hyper::Uri;
+use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use url::Url;
 
-use super::metrics;
-use super::plan;
-use super::report;
-use super::Config;
-use super::Report;
-use super::Signaller;
+use super::{metrics, plan, report, Config, Report, Signaller};
 
 pub struct Profiler {
     config: Config,

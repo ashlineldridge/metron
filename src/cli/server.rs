@@ -24,11 +24,7 @@ responses, latency, and other properties.
 
 /// Returns all [`clap::Arg`]s for the `server` subcommand.
 fn all_args() -> Vec<clap::Arg<'static>> {
-    vec![
-        arg_log_level(),
-        arg_port(),
-        arg_worker_threads(),
-    ]
+    vec![arg_log_level(), arg_port(), arg_worker_threads()]
 }
 
 /// Returns the [`clap::ArgGroup`]s for the `server` subcommand.
@@ -48,7 +44,7 @@ severity level will be printed.
         .long("log-level")
         .value_name("LEVEL")
         .default_value("info")
-        .possible_values(&["off", "trace", "debug", "info", "warn", "error"])
+        .possible_values(&["off", "debug", "info", "warn", "error"])
         .help(SHORT)
         .long_help(LONG)
 }

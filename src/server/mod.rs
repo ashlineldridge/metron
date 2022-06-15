@@ -9,8 +9,7 @@ use std::{
 };
 
 use anyhow::Result;
-use hyper::http;
-use hyper::{Body, Request, Response};
+use hyper::{http, Body, Request, Response};
 use log::info;
 use tower::{make::Shared, Service, ServiceBuilder};
 
@@ -26,7 +25,9 @@ pub async fn serve(config: &Config) -> Result<()> {
     info!("Server listening on :{}", config.port);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
-    hyper::Server::bind(&addr).serve(Shared::new(service)).await?;
+    hyper::Server::bind(&addr)
+        .serve(Shared::new(service))
+        .await?;
 
     Ok(())
 }

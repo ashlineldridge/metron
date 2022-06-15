@@ -1,4 +1,4 @@
-use crate::cli::{profile, server};
+use crate::cli::{profile, server, validate};
 
 const ABOUT: &str = "
 Metron is a modern L7 performance profiler.
@@ -9,7 +9,7 @@ Project home: https://github.com/ashlineldridge/metron
 ";
 
 /// Returns the root [`clap::Command`] for the application.
-pub(crate) fn command() -> clap::Command<'static> {
+pub fn command() -> clap::Command<'static> {
     use clap::*;
 
     Command::new("metron")
@@ -29,10 +29,49 @@ fn all_subcommands() -> Vec<clap::Command<'static>> {
 
 /// Returns all [`clap::Arg`]s for the root command.
 fn common_args() -> Vec<clap::Arg<'static>> {
-    vec![]
+    vec![arg_config_file(), arg_print_config()]
 }
 
 /// Returns the [`clap::ArgGroup`]s for the root command.
 fn common_arg_groups() -> Vec<clap::ArgGroup<'static>> {
     vec![]
+}
+
+/// Returns the [`clap::Arg`] for `--config-file`.
+fn arg_config_file() -> clap::Arg<'static> {
+    const SHORT: &str = "Configuration file.";
+    const LONG: &str = "\
+All commands allow a configuration file to be used as an alternative to
+individual command line arguments. Stdin can also be used by specifying
+a hyphen as the file name (i.e., `--config-file -`).
+
+When both a configuration file and individual command line arguments are used,
+the arguments will override their counterpart properties in the configuration
+file.
+
+See --print-config for bootstrapping a configuration file.
+";
+
+    clap::Arg::new("config-file")
+        .long("config-file")
+        .value_name("FILE")
+        .validator(validate::file)
+        .help(SHORT)
+        .long_help(LONG)
+}
+
+/// Returns the [`clap::Arg`] for `--print-config`.
+fn arg_print_config() -> clap::Arg<'static> {
+    const SHORT: &str = "Prints the configuration.";
+    const LONG: &str = "\
+Generates the configuration for this command and prints it to stdout. This may
+be used to bootstrap a configuration file based on command line arguments so
+that a configuration file can be used rather than individual command line
+arguments.
+";
+
+    clap::Arg::new("print-config")
+        .long("print-config")
+        .help(SHORT)
+        .long_help(LONG)
 }

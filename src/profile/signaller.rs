@@ -1,11 +1,13 @@
 use std::time::Instant;
 
 use anyhow::Result;
-use serde::Deserialize;
-use tokio::sync::mpsc;
-use tokio::task;
+use serde::{Deserialize, Serialize};
 use tokio::{
-    sync::mpsc::{Receiver, Sender},
+    sync::{
+        mpsc,
+        mpsc::{Receiver, Sender},
+    },
+    task,
     task::JoinHandle,
 };
 
@@ -54,7 +56,7 @@ pub struct Signaller {
 ///
 /// The signaller kind dictates the concurrency model that the signaller uses
 /// to produce timing signals.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub enum Kind {
     /// A `Blocking` signaller creates a dedicated thread for producing
     /// timing signals. This is the most accurate signaller for interval-
@@ -67,6 +69,12 @@ pub enum Kind {
     /// threaded environments or when you want to dedicate your threading
     /// resources elsewhere.
     Cooperative,
+}
+
+impl Default for Kind {
+    fn default() -> Self {
+        Self::Blocking
+    }
 }
 
 impl Signaller {

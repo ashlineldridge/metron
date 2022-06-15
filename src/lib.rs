@@ -1,6 +1,7 @@
 use std::{ops::Deref, str::FromStr, time::Duration};
 
-use serde::{Serialize, Deserialize};
+use log::LevelFilter;
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
 #[serde(transparent)]
@@ -34,4 +35,38 @@ impl FromStr for Rate {
     }
 }
 
-pub type LogLevel = log::LevelFilter;
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    Off,
+    Error,
+    Warn,
+    Info,
+    Debug,
+}
+
+impl LogLevel {
+    pub fn as_filter(&self) -> LevelFilter {
+        match self {
+            LogLevel::Off => LevelFilter::Off,
+            LogLevel::Error => LevelFilter::Error,
+            LogLevel::Warn => LevelFilter::Warn,
+            LogLevel::Info => LevelFilter::Info,
+            LogLevel::Debug => LevelFilter::Debug,
+        }
+    }
+}
+
+impl Default for LogLevel {
+    fn default() -> Self {
+        Self::Off
+    }
+}
+
+impl FromStr for LogLevel {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(serde_yaml::from_str(s)?)
+    }
+}

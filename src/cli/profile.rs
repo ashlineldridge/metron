@@ -116,7 +116,7 @@ severity level will be printed.
         .long("log-level")
         .value_name("LEVEL")
         .default_value("off")
-        .possible_values(&["off", "trace", "debug", "info", "warn", "error"])
+        .possible_values(&["off", "debug", "info", "warn", "error"])
         .help(SHORT)
         .long_help(LONG)
 }
@@ -148,7 +148,7 @@ See https://docs.rs/humantime/latest/humantime for time format details.
 
 /// Returns the [`clap::Arg`] for `--forever`.
 fn arg_forever() -> clap::Arg<'static> {
-    const SHORT: &str = "Run forever (or until Ctrl+Ci pressed).";
+    const SHORT: &str = "Run forever (or until Ctrl+C pressed).";
     const LONG: &str = "\
 Specifies that the load test should run forever, or until Ctrl+C is pressed.
 This flag applies to the primary portion of the load test, after any ramp has

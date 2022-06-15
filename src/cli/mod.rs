@@ -3,10 +3,14 @@ mod root;
 mod server;
 mod validate;
 
-use std::fs;
+use std::{
+    fs::{self, File},
+    io,
+};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use metron::Rate;
+use serde::de::DeserializeOwned;
 
 use crate::{
     config,
@@ -26,58 +30,66 @@ pub fn parse() -> Result<config::Config> {
     // `panic!` as if we were to encounter these it'd mean we've misconfigured clap.
     let subcommand = matches.subcommand().unwrap();
     let config = match subcommand {
-        ("profile", matches) => parse_profile_config(matches),
-        ("server", matches) => parse_server_config(matches),
+        ("profile", matches) => config::Config::Profile(parse_profile_config(matches)?),
+        ("server", matches) => config::Config::Server(parse_server_config(matches)?),
         _ => panic!("Unknown subcommand"),
     };
 
     Ok(config)
 }
 
-fn parse_profile_config(matches: &clap::ArgMatches) -> config::Config {
-    let mut blocks = vec![];
+fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Config> {
+    // Deserialize the config file if one was specified. Additional command line
+    // options are then applied on top.
+    let mut config = if let Some(config) = parse_config_file(matches)? {
+        config
+    } else {
+        crate::profile::Config::default()
+    };
 
     // Add a linear ramp block if requested.
     if matches.is_present("group-ramp") {
-        blocks.push(RateBlock::Linear(
-            matches.value_of_t_or_exit::<Rate>("ramp-rate-start"),
-            matches.value_of_t_or_exit::<Rate>("rate-rate-end"),
-            matches
-                .value_of_t_or_exit::<humantime::Duration>("ramp-duration")
-                .into(),
-        ));
+        let rate_start = matches.value_of_t_or_exit::<Rate>("ramp-rate-start");
+        let rate_end = matches.value_of_t_or_exit::<Rate>("rate-rate-end");
+        let duration = matches
+            .value_of_t_or_exit::<humantime::Duration>("ramp-duration")
+            .into();
+
+        config.blocks.push(RateBlock::Linear {
+            rate_start,
+            rate_end,
+            duration,
+        });
     }
 
     // Add the fixed rate block.
     let rate = matches.value_of_t_or_exit::<Rate>("rate");
     let duration = if matches.is_present("duration") {
-        Some(
-            matches
-                .value_of_t_or_exit::<humantime::Duration>("duration")
-                .into(),
-        )
+        let duration = matches
+            .value_of_t_or_exit::<humantime::Duration>("duration")
+            .into();
+        Some(duration)
     } else {
         None
     };
 
-    blocks.push(RateBlock::Fixed(rate, duration));
+    config.blocks.push(RateBlock::Fixed { rate, duration });
 
-    let connections = matches.value_of_t_or_exit("connections");
-    let http_method = matches.value_of_t_or_exit("http-method");
-
-    let targets = if matches.is_present("target") {
+    config.connections = matches.value_of_t_or_exit("connections");
+    config.http_method = matches.value_of_t_or_exit("http-method");
+    config.targets = if matches.is_present("target") {
         vec![matches.value_of_t_or_exit("target")]
     } else {
         matches.values_of_t_or_exit("multi-target")
     };
 
-    let headers = if matches.is_present("header") {
+    config.headers = if matches.is_present("header") {
         matches.values_of_t_or_exit("header")
     } else {
         vec![]
     };
 
-    let payload = if matches.is_present("payload") {
+    config.payload = if matches.is_present("payload") {
         Some(matches.value_of_t_or_exit("payload"))
     } else if matches.is_present("payload-file") {
         let file = matches.value_of_t_or_exit::<String>("payload-file");
@@ -87,51 +99,67 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> config::Config {
         None
     };
 
-    let runtime = parse_runtime_config(matches);
+    config.runtime = parse_runtime_config(matches)?;
 
-    let signaller_kind = match matches.value_of("signaller").unwrap() {
+    config.signaller_kind = match matches.value_of("signaller").unwrap() {
         "blocking" => SignallerKind::Blocking,
         "cooperative" => SignallerKind::Cooperative,
         s => panic!("Invalid signaller: {}", s),
     };
 
-    let stop_on_error = matches.value_of_t_or_exit("stop-on-error");
-    let stop_on_non_2xx = matches.value_of_t_or_exit("stop-on-non-2xx");
-    let log_level = matches.value_of_t_or_exit("log-level");
+    config.stop_on_error = matches.value_of_t_or_exit("stop-on-error");
+    config.stop_on_non_2xx = matches.value_of_t_or_exit("stop-on-non-2xx");
+    config.log_level = matches.value_of_t_or_exit("log-level");
 
-    config::Config::Profile(crate::profile::Config {
-        blocks,
-        connections,
-        http_method,
-        targets,
-        headers,
-        payload,
-        runtime,
-        signaller_kind,
-        stop_on_error,
-        stop_on_non_2xx,
-        log_level,
-    })
+    Ok(config)
 }
 
-fn parse_server_config(matches: &clap::ArgMatches) -> config::Config {
-    let port = matches.value_of_t_or_exit("port");
-    let runtime = parse_runtime_config(matches);
-    let log_level = matches.value_of_t_or_exit("log-level");
-
-    config::Config::Server(crate::server::Config {
-        port,
-        runtime,
-        log_level,
-    })
-}
-
-fn parse_runtime_config(matches: &clap::ArgMatches) -> runtime::Config {
-    let worker_threads = if matches.is_present("worker-threads") {
-        matches.value_of_t_or_exit("worker-threads")
+fn parse_server_config(matches: &clap::ArgMatches) -> Result<crate::server::Config> {
+    // Deserialize the config file if one was specified. Additional command line
+    // options are then applied on top.
+    let mut config = if let Some(config) = parse_config_file(matches)? {
+        config
     } else {
-        num_cpus::get()
+        crate::server::Config::default()
     };
 
-    runtime::Config { worker_threads }
+    config.runtime = parse_runtime_config(matches)?;
+
+    config.port = matches.value_of_t_or_exit("port");
+    config.log_level = matches.value_of_t_or_exit("log-level");
+
+    Ok(config)
+}
+
+fn parse_runtime_config(matches: &clap::ArgMatches) -> Result<runtime::Config> {
+    let config = if matches.is_present("worker-threads") {
+        let worker_threads = matches.value_of_t_or_exit("worker-threads");
+        runtime::Config { worker_threads }
+    } else {
+        Default::default()
+    };
+
+    Ok(config)
+}
+
+/// Parses the config file if one has been specified.
+fn parse_config_file<T>(matches: &clap::ArgMatches) -> Result<Option<T>>
+where
+    T: DeserializeOwned,
+{
+    let config = match matches.value_of("config-file") {
+        Some(f) if f == "-" => {
+            let d = serde_yaml::from_reader(io::stdin())
+                .context("Error parsing YAML configuration from stdin")?;
+            Some(d)
+        }
+        Some(f) => {
+            let d = serde_yaml::from_reader(File::open(f)?)
+                .context(format!("Error parsing YAML configuration file: {}", f))?;
+            Some(d)
+        }
+        None => None,
+    };
+
+    Ok(config)
 }
