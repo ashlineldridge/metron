@@ -60,7 +60,7 @@ impl Profiler {
         let payload = self.config.payload.clone().unwrap_or_default();
 
         let (tx, rx) = mpsc::channel(1024);
-        let plan = plan::Builder::new().blocks(&self.config.blocks).build();
+        let plan = plan::Builder::new().segments(&self.config.segments).build();
         let mut signaller = Signaller::start(self.config.signaller_kind, plan.clone());
 
         tokio::spawn(async move {

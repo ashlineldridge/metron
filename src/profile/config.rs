@@ -6,13 +6,13 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 use crate::{
-    profile::{RateBlock, SignallerKind},
+    profile::{PlanSegment, SignallerKind},
     runtime,
 };
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Config {
-    pub blocks: Vec<RateBlock>,
+    pub segments: Vec<PlanSegment>,
     pub connections: usize,
     pub http_method: String,
     pub targets: Vec<Url>,

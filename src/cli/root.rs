@@ -75,3 +75,8 @@ arguments.
         .help(SHORT)
         .long_help(LONG)
 }
+
+#[test]
+fn verify_command() {
+    command().debug_assert();
+}

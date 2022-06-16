@@ -7,7 +7,7 @@ mod signaller;
 
 pub use self::{
     config::Config,
-    plan::{Plan, RateBlock},
+    plan::{Plan, PlanSegment},
     profiler::Profiler,
     report::Report,
     signaller::{Kind as SignallerKind, Signal, Signaller},

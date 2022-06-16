@@ -8,13 +8,12 @@ use std::{
     io,
 };
 
-use anyhow::{Context, Result};
-use metron::Rate;
+use anyhow::{bail, Context, Result};
 use serde::de::DeserializeOwned;
 
 use crate::{
     config,
-    profile::{RateBlock, SignallerKind},
+    profile::{PlanSegment, SignallerKind},
     runtime,
 };
 
@@ -47,33 +46,54 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
         crate::profile::Config::default()
     };
 
-    // Add a linear ramp block if requested.
-    if matches.is_present("group-ramp") {
-        let rate_start = matches.value_of_t_or_exit::<Rate>("ramp-rate-start");
-        let rate_end = matches.value_of_t_or_exit::<Rate>("rate-rate-end");
-        let duration = matches
-            .value_of_t_or_exit::<humantime::Duration>("ramp-duration")
-            .into();
+    let rates = matches.values_of_t::<String>("rate")?;
+    let durations = matches.values_of_t::<String>("duration")?;
 
-        config.blocks.push(RateBlock::Linear {
-            rate_start,
-            rate_end,
-            duration,
-        });
+    if rates.len() != durations.len() {
+        return Err(profile::command()
+            .error(
+                clap::ErrorKind::WrongNumberOfValues,
+                "The number of --rate and --duration arguments must match",
+            )
+            .into());
+
+        // let mut cmd = clap::Command::new("foobar");
+        // return Err(clap::Error::raw(
+        //     clap::ErrorKind::Format,
+        //     "The number of --rate and --duration arguments must match",
+        // )
+        // .format(&mut cmd)
+        // .into());
+        // bail!("The number of --rate and --duration arguments must match");
     }
 
-    // Add the fixed rate block.
-    let rate = matches.value_of_t_or_exit::<Rate>("rate");
-    let duration = if matches.is_present("duration") {
-        let duration = matches
-            .value_of_t_or_exit::<humantime::Duration>("duration")
-            .into();
-        Some(duration)
-    } else {
-        None
-    };
+    for (rate, duration) in rates.into_iter().zip(durations) {
+        let duration = if duration == "forever" {
+            None
+        } else {
+            let duration = duration.parse::<humantime::Duration>()?;
+            Some(duration.into())
+        };
 
-    config.blocks.push(RateBlock::Fixed { rate, duration });
+        let segment = if let Some((rate_start, rate_end)) = rate.split_once(':') {
+            if let Some(duration) = duration {
+                let rate_start = rate_start.parse()?;
+                let rate_end = rate_end.parse()?;
+                PlanSegment::Linear {
+                    rate_start,
+                    rate_end,
+                    duration,
+                }
+            } else {
+                bail!("A finite duration must be used when the rate varies over time");
+            }
+        } else {
+            let rate = rate.parse()?;
+            PlanSegment::Fixed { rate, duration }
+        };
+
+        config.segments.push(segment);
+    }
 
     config.connections = matches.value_of_t_or_exit("connections");
     config.http_method = matches.value_of_t_or_exit("http-method");

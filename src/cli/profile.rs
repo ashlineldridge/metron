@@ -5,8 +5,8 @@ use crate::cli::validate::{self, validate};
 /// # Examples
 /// ```bash
 /// metron profile \
-///   --duration 20s \
 ///   --rate 100 \
+///   --duration 20s \
 ///   https://example.com
 /// ```
 pub fn command() -> clap::Command<'static> {
@@ -27,15 +27,9 @@ The report can be written to stdout and/or streamed to a metrics backend.
 /// Returns all [`clap::Arg`]s for the `profile` subcommand.
 fn all_args() -> Vec<clap::Arg<'static>> {
     vec![
-        arg_log_level(),
-        arg_duration(),
-        arg_forever(),
         arg_rate(),
-        arg_ramp_duration(),
-        arg_ramp_rate_start(),
-        arg_ramp_rate_end(),
+        arg_duration(),
         arg_target(),
-        arg_multi_target(),
         arg_http_method(),
         arg_payload(),
         arg_payload_file(),
@@ -46,55 +40,13 @@ fn all_args() -> Vec<clap::Arg<'static>> {
         arg_signaller(),
         arg_stop_on_error(),
         arg_stop_on_non_2xx(),
+        arg_log_level(),
     ]
 }
 
 /// Returns the [`clap::ArgGroup`]s for the `profile` subcommand.
 fn all_arg_groups() -> Vec<clap::ArgGroup<'static>> {
-    vec![
-        arg_group_primary(),
-        arg_group_primary_duration(),
-        arg_group_target(),
-        arg_group_ramp(),
-        arg_group_payload(),
-    ]
-}
-
-/// Returns the [`clap::ArgGroup`] for the primary load test arguments.
-///
-/// The primary load testing arguments are the arguments which dictate how the
-/// primary portion of the load test runs. The primary portion refers to the
-/// duration of the load test that follows any throughput ramp.
-fn arg_group_primary() -> clap::ArgGroup<'static> {
-    clap::ArgGroup::new("group-primary").multiple(true)
-}
-
-/// Returns the [`clap::ArgGroup`] for the primary duration arguments.
-///
-/// This argument group ensures that a primary duration has been set (using
-/// `--duration` or `--forever`).
-fn arg_group_primary_duration() -> clap::ArgGroup<'static> {
-    clap::ArgGroup::new("group-primary-duration")
-        .multiple(false)
-        .required(true)
-}
-
-/// Returns the [`clap::ArgGroup`] for the target arguments.
-///
-/// This argument group ensures that at least one target has been set.
-fn arg_group_target() -> clap::ArgGroup<'static> {
-    clap::ArgGroup::new("group-target")
-        .multiple(false)
-        .required(true)
-}
-
-/// Returns the [`clap::ArgGroup`] for the ramp load test arguments.
-///
-/// The ramp load testing arguments are the arguments which dictate how the
-/// ramp portion of the load test runs. The ramp precedes the primary portion
-/// of the load test.
-fn arg_group_ramp() -> clap::ArgGroup<'static> {
-    clap::ArgGroup::new("group-ramp").multiple(true)
+    vec![arg_group_payload()]
 }
 
 /// Returns the [`clap::ArgGroup`] for payload arguments.
@@ -104,184 +56,95 @@ fn arg_group_payload() -> clap::ArgGroup<'static> {
     clap::ArgGroup::new("group-payload").multiple(false)
 }
 
-/// Returns the [`clap::Arg`] for `--log-level`.
-fn arg_log_level() -> clap::Arg<'static> {
-    const SHORT: &str = "Minimum logging level.";
+/// Returns the [`clap::Arg`] for `--rate`.
+fn arg_rate() -> clap::Arg<'static> {
+    const SHORT: &str = "Desired throughput rates.";
     const LONG: &str = "\
-Sets the minimum logging level. Log messages at or above the specified
-severity level will be printed.
+Sets the desired throughput rate in terms of the number of requests per second
+(RPS) that should be generated for each segment of the test.
+
+This argument can receive multiple values and may be used to specify both fixed
+and variable rates. To specify a fixed rate, specify an integer value; e.g.,
+--rate=100 --duration=15m implies a fixed rate of 100 RPS for 15 minutes. To use
+a variable rate, specify a range; e.g., --rate=100:200 --duration=15m implies
+that the request rate should increase linearly from 100 RPS to 200 RPS over a 15
+minute duration.
+
+To specify multiple test plan segments, where each segment can have its own rate
+and duration, specify multiple comma-separated values; e.g., --rate=100:500,500
+--duration=5m,15m will create a 20 minute test plan containing two segments: the
+initial segment will ramp the rate up from 100 RPS to 500 RPS over the first
+5 minutes and then the rate will be held at a constant 500 RPS for the next 15
+minutes. When multiple values are specified, both --rate and --duration must
+receive the same number of values.
 ";
 
-    clap::Arg::new("log-level")
-        .long("log-level")
-        .value_name("LEVEL")
-        .default_value("off")
-        .possible_values(&["off", "debug", "info", "warn", "error"])
+    clap::Arg::new("rate")
+        .long("rate")
+        .value_name("RATES")
+        .required(true)
+        .multiple_values(true)
+        .use_value_delimiter(true)
+        .require_value_delimiter(true)
+        .value_delimiter(',')
         .help(SHORT)
         .long_help(LONG)
 }
 
 /// Returns the [`clap::Arg`] for `--duration`.
 fn arg_duration() -> clap::Arg<'static> {
-    const SHORT: &str = "Primary load test duration.";
+    const SHORT: &str = "Performance test durations.";
     const LONG: &str = "\
-Sets the primary duration of the load test to DURATION where DURATION is
-specified in human-readable time format. For example, a value of
-\"1hour 30min 30s\" will run the test for 1 hour, 30 minutes, and 30 seconds.
+Sets the durations of each test segment.
 
-The duration specified by this argument does not include any ramp duration
-(see --ramp-duration and --ramp-rate-start). The total duration for a load
-test is the primary duration plus any ramp duration.
+This argument can receive one or more values; the number of values specified
+must match the number of values passed to --rate. Each value defines the
+duration of the associated test segment.
 
-Either --duration or --forever must be specified, but not both.
+To specify multiple test plan segments, where each segment can have its own rate
+and duration, specify multiple comma-separated values; e.g., --rate=100:500,500
+--duration=5m,15m will create a 20 minute test plan containing two segments: the
+initial segment will ramp the rate up from 100 RPS to 500 RPS over the first
+5 minutes and then the rate will be held at a constant 500 RPS for the next 15
+minutes.
+
+A value of \"forever\" may be specified for fixed rate segments to indicate that
+the test should run forever or until CTRL-C is pressed. When specifying multiple
+test segments, \"forever\" can only be specified for the last segment. E.g.,
+--rate=100,200 --duration=5m,forever will will create an infinite test plan
+containing two segments: the first segment will rate 100 RPS for 5 minutes and
+then the second segment will rate 200 RPS until it is interrupted. Variable rate
+segments are not allowed to have a value of \"forever\" as these segments must
+be able to be calculated over a finite duration.
 
 See https://docs.rs/humantime/latest/humantime for time format details.
 ";
 
     clap::Arg::new("duration")
         .long("duration")
-        .groups(&["group-primary", "group-primary-duration"])
-        .value_name("DURATION")
+        .value_name("DURATIONS")
+        .required(true)
+        .multiple_values(true)
+        .use_value_delimiter(true)
+        .require_value_delimiter(true)
+        .value_delimiter(',')
         .help(SHORT)
         .long_help(LONG)
 }
 
-/// Returns the [`clap::Arg`] for `--forever`.
-fn arg_forever() -> clap::Arg<'static> {
-    const SHORT: &str = "Run forever (or until Ctrl+C pressed).";
-    const LONG: &str = "\
-Specifies that the load test should run forever, or until Ctrl+C is pressed.
-This flag applies to the primary portion of the load test, after any ramp has
-been executed.
-
-Either --duration or --forever must be specified, but not both.
-";
-
-    clap::Arg::new("forever")
-        .long("forever")
-        .groups(&["group-primary", "group-primary-duration"])
-        .help(SHORT)
-        .long_help(LONG)
-}
-
-/// Returns the [`clap::Arg`] for `--rate`.
-fn arg_rate() -> clap::Arg<'static> {
-    const SHORT: &str = "Primary request rate (per second).";
-    const LONG: &str = "\
-Sets the primary request rate for the load test to be fixed to RATE requests
-per second.
-
-If a ramp is being used (see --ramp-duration and --ramp-rate-start),
-this primary request rate will kick in after the ramp is complete.
-
-See https://docs.rs/humantime/latest/humantime for time format details.
-";
-
-    clap::Arg::new("rate")
-        .long("rate")
-        .group("group-primary")
-        .value_name("RATE")
-        .help(SHORT)
-        .long_help(LONG)
-}
-
-/// Returns the [`clap::Arg`] for `--ramp-duration`.
-fn arg_ramp_duration() -> clap::Arg<'static> {
-    const SHORT: &str = "Ramped throughput duration.";
-    const LONG: &str = "\
-Sets the ramp duration of the load test to DURATION where DURATION is specified
-in human-readable time format. For example, a value of \"5min 30s\" will ramp
-the throughput over a period of 5 minutes and 30 seconds.
-
-If this argument is specified, both --ramp-rate-start and --ramp-rate-end must
-also be specified.
-
-See https://docs.rs/humantime/latest/humantime for time format details.
-";
-
-    clap::Arg::new("ramp-duration")
-        .long("ramp-duration")
-        .group("group-ramp")
-        .requires_all(&["ramp-rate-start", "ramp-rate-end"])
-        .value_name("DURATION")
-        .validator(validate::<humantime::Duration>)
-        .help(SHORT)
-        .long_help(LONG)
-}
-
-/// Returns the [`clap::Arg`] for `--ramp-rate-start`.
-fn arg_ramp_rate_start() -> clap::Arg<'static> {
-    const SHORT: &str = "Starting rate for the ramp.";
-    const LONG: &str = "\
-Sets the starting request rate (in requests per second) for the throughput ramp
-that will be used to begin the load test.
-
-If this argument is specified, both --ramp-duration and --ramp-rate-end must
-also be specified.
-";
-
-    clap::Arg::new("ramp-rate-start")
-        .long("ramp-rate-start")
-        .group("group-ramp")
-        .requires_all(&["ramp-duration", "ramp-rate-end"])
-        .value_name("RATE")
-        .help(SHORT)
-        .long_help(LONG)
-}
-
-/// Returns the [`clap::Arg`] for `--ramp-rate-end`.
-fn arg_ramp_rate_end() -> clap::Arg<'static> {
-    const SHORT: &str = "Ending rate for the ramp.";
-    const LONG: &str = "\
-Sets the ending request rate (in requests per second) for the throughput ramp
-that will be used to begin the load test.
-
-If this argument is specified, both --ramp-duration and --ramp-rate-start
-must also be specified.
-";
-
-    clap::Arg::new("ramp-rate-end")
-        .long("ramp-rate-end")
-        .group("group-ramp")
-        .requires_all(&["ramp-duration", "ramp-rate-start"])
-        .value_name("RATE")
-        .help(SHORT)
-        .long_help(LONG)
-}
-
-/// Returns the positional [`clap::Arg`] for `<TARGET>`.
+/// Returns the [`clap::Arg`] for `--target`.
 fn arg_target() -> clap::Arg<'static> {
-    const SHORT: &str = "Load test target.";
+    const SHORT: &str = "Performance profile target(s).";
     const LONG: &str = "\
-Sets the target URL for the load test. HTTP and HTTPS URLs are supported.
+Sets one or more target URLs for the performance profile. HTTP and HTTPS URLs
+are supported.
 
-To specify multiple targets see --multi-target. Either this positional argument
-or --multi-target must be specified, but not both.
+This argument may be specified multiple times to specify multiple targets. The
+performance test will evenly distribute requests between the targets using round-robin.
 ";
 
     clap::Arg::new("target")
-        .group("group-target")
-        .value_name("URL")
-        .validator(validate::url)
-        .help(SHORT)
-        .long_help(LONG)
-}
-
-/// Returns the [`clap::Arg`] for `--multi-target`.
-fn arg_multi_target() -> clap::Arg<'static> {
-    const SHORT: &str = "Load test multiple targets.";
-    const LONG: &str = "\
-Sets one or more target URLs for the load test. HTTP and HTTPS URLs are supported.
-
-This argument may be specified multiple times to specify multiple targets. The load
-test will evenly distribute requests between the targets using round-robin.
-
-This argument is incompatible with the <TARGET> positional argument.
-";
-
-    clap::Arg::new("multi-target")
-        .long("multi-target")
-        .group("group-target")
+        .long("target")
         .value_name("URL")
         .multiple_occurrences(true)
         .validator(validate::url)
@@ -485,6 +348,23 @@ See --stop-on-error for setting error stopping behaviour.
         .value_name("BOOL")
         .default_value("false")
         .validator(validate::<bool>)
+        .help(SHORT)
+        .long_help(LONG)
+}
+
+/// Returns the [`clap::Arg`] for `--log-level`.
+fn arg_log_level() -> clap::Arg<'static> {
+    const SHORT: &str = "Minimum logging level.";
+    const LONG: &str = "\
+Sets the minimum logging level. Log messages at or above the specified
+severity level will be printed.
+";
+
+    clap::Arg::new("log-level")
+        .long("log-level")
+        .value_name("LEVEL")
+        .default_value("off")
+        .possible_values(&["off", "debug", "info", "warn", "error"])
         .help(SHORT)
         .long_help(LONG)
 }

@@ -9,14 +9,14 @@ use serde::{Deserialize, Serialize};
 /// test target.
 #[derive(Clone, Debug, Deserialize)]
 pub struct Plan {
-    /// Plan building blocks.
-    blocks: Vec<RateBlock>,
+    /// Segments that define how the request rate varies over the plan.
+    segments: Vec<PlanSegment>,
 }
 
 /// Describes how request rate should be treated over a given duration.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
-pub enum RateBlock {
+pub enum PlanSegment {
     /// Rate should be fixed over the given duration (or forever).
     Fixed {
         rate: Rate,
@@ -34,11 +34,11 @@ pub enum RateBlock {
     },
 }
 
-impl RateBlock {
+impl PlanSegment {
     fn duration(&self) -> Option<Duration> {
         match self {
-            RateBlock::Fixed { duration, .. } => *duration,
-            RateBlock::Linear { duration, .. } => Some(*duration),
+            PlanSegment::Fixed { duration, .. } => *duration,
+            PlanSegment::Linear { duration, .. } => Some(*duration),
         }
     }
 }
@@ -52,30 +52,30 @@ impl Plan {
     ///
     /// If the returned value is `None` the plan runs forever.
     pub fn calculate_duration(&self) -> Option<Duration> {
-        self.blocks
+        self.segments
             .iter()
-            .fold(Some(Duration::from_secs(0)), |total, b| {
-                match (total, b.duration()) {
+            .fold(Some(Duration::from_secs(0)), |total, seg| {
+                match (total, seg.duration()) {
                     (Some(total), Some(d)) => Some(total + d),
                     _ => None,
                 }
             })
     }
 
-    /// Gets the `RateBlock` that `progress` falls into.
+    /// Finds the `PlanSegment` that `progress` falls into.
     ///
     /// If the returned value is `None` then we have completed the plan.
-    fn get_block(&self, progress: Duration) -> Option<RateBlock> {
+    fn find_segment(&self, progress: Duration) -> Option<PlanSegment> {
         let mut total = Duration::from_secs(0);
-        for b in &self.blocks {
-            if let Some(d) = b.duration() {
+        for seg in &self.segments {
+            if let Some(d) = seg.duration() {
                 total += d;
                 if progress < total {
-                    return Some(b.clone());
+                    return Some(seg.clone());
                 }
             } else {
                 // The plan runs forever.
-                return Some(b.clone());
+                return Some(seg.clone());
             }
         }
 
@@ -112,15 +112,15 @@ impl<'a> Iterator for Ticks<'a> {
         // How far into the plan are we?
         let progress = self.prev.unwrap_or(self.start) - self.start;
 
-        if let Some(block) = self.plan.get_block(progress) {
+        if let Some(block) = self.plan.find_segment(progress) {
             // Calculate the next value in the series.
             let next = match block {
-                RateBlock::Fixed { rate, .. } => self
+                PlanSegment::Fixed { rate, .. } => self
                     .prev
                     .map(|t| t + rate.as_interval())
                     .unwrap_or(self.start),
 
-                RateBlock::Linear {
+                PlanSegment::Linear {
                     rate_start,
                     rate_end,
                     duration,
@@ -161,7 +161,7 @@ impl<'a> Iterator for Ticks<'a> {
 /// // Construct a plan that ramps up throughput from 10 RPS to 500 RPS over
 /// // the first 60 seconds and then maintains 500 RPS for a further 5 minutes.
 /// let plan = Builder::new()
-///   .linear_rate_block(Rate(10), Rate(500), Duration::from_secs(60))
+///   .segments(vec![])
 ///   .fixed_rate_block(Rate(500), Duration::from_secs(5 * 60))
 ///   .build()
 ///   .unwrap();
@@ -174,13 +174,13 @@ pub struct Builder {
 impl Builder {
     pub fn new() -> Self {
         Self {
-            plan: Plan { blocks: vec![] },
+            plan: Plan { segments: vec![] },
         }
     }
 
-    pub fn blocks(mut self, blocks: &[RateBlock]) -> Builder {
-        for block in blocks {
-            self.plan.blocks.push(block.clone());
+    pub fn segments(mut self, segments: &[PlanSegment]) -> Builder {
+        for seg in segments {
+            self.plan.segments.push(seg.clone());
         }
 
         self
