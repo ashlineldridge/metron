@@ -70,3 +70,9 @@ impl FromStr for LogLevel {
         Ok(serde_yaml::from_str(s)?)
     }
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct Header {
+    pub name: String,
+    pub value: String,
+}

@@ -1,4 +1,4 @@
-use crate::cli::{profile, server, validate};
+use crate::cli::{profile, server};
 
 const ABOUT: &str = "
 Metron is a modern L7 performance profiler.
@@ -16,8 +16,12 @@ pub fn command() -> clap::Command<'static> {
         .author(crate_authors!())
         .version(crate_version!())
         .about(ABOUT)
+        .global_setting(AppSettings::DeriveDisplayOrder)
+        .arg_required_else_help(true)
         .subcommands(all_subcommands())
         .subcommand_required(true)
+        // .propagate_version(true)
+        // .mut_arg("version", |a| a.short('v'))
 }
 
 fn all_subcommands() -> Vec<clap::Command<'static>> {
@@ -55,7 +59,6 @@ See --print-config for bootstrapping a configuration file.
     clap::Arg::new("config-file")
         .long("config-file")
         .value_name("FILE")
-        .validator(validate::file)
         .help(SHORT)
         .long_help(LONG)
 }

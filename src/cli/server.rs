@@ -1,4 +1,4 @@
-use crate::cli::validate::validate;
+use clap::value_parser;
 
 /// Creates the [`clap::Command`] for the `server` subcommand.
 ///
@@ -44,7 +44,7 @@ severity level will be printed.
         .long("log-level")
         .value_name("LEVEL")
         .default_value("info")
-        .possible_values(&["off", "debug", "info", "warn", "error"])
+        .value_parser(["off", "debug", "info", "warn", "error"])
         .help(SHORT)
         .long_help(LONG)
 }
@@ -60,7 +60,7 @@ Sets the server listening port to PORT. Defaults to 8000.
         .long("port")
         .value_name("PORT")
         .default_value("8000")
-        .validator(validate::<u16>)
+        .value_parser(value_parser!(u16))
         .help(SHORT)
         .long_help(LONG)
 }
@@ -78,7 +78,7 @@ host machine.
     clap::Arg::new("worker-threads")
         .long("worker-threads")
         .value_name("COUNT")
-        .validator(validate::<usize>)
+        .value_parser(value_parser!(u64).range(1..1000))
         .help(SHORT)
         .long_help(LONG)
 }

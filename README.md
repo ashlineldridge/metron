@@ -13,25 +13,12 @@ MPSC Channel --> Control Task --> Plan
 
 ## TODO
 
-1. Read and compose super rough error handling note:
-  - https://blog.rust-lang.org/inside-rust/2021/07/01/What-the-error-handling-project-group-is-working-towards.html
-  - https://www.reddit.com/r/rust/comments/obw7lu/what_the_error_handling_project_group_is_working/
-  - https://nick.groenen.me/posts/rust-error-handling/
-  - https://www.reddit.com/r/rust/comments/gj8inf/rust_structuring_and_handling_errors_in_2020/
-  - https://github.com/dtolnay/thiserror (example [here](https://github.com/sharkdp/bat/blob/master/src/error.rs))
-  - https://www.reddit.com/r/rust/comments/8dvldm/why_rusts_error_handling_is_awesome/
-  - https://www.reddit.com/r/rust/comments/asf5h7/handling_multiple_error_types_in_a_large_web/
+- Check that the CLI makes sense and is consistent
+- Check that the long help messages are just as helpful in terms of hints for enums (e.g., --log-level), range options (e.g., )
+- Think about cli/ package structure, file names, etc
+- Add CLI tests
 
-2. Implement advice from above in error handling for this project.
-
-3. Make sure that we've got:
-  - Pretty printing of errors (e.g., clap error colorization isn't lost)
-  - Backtraces
-  - Extensibility (cater for all future possible error types / scenarios)
-  - Why use `enum Error` vs `struct Error` + `enum ErrorKind`?
-
-4. Clean up and complete error handling note.
-
-## Links
-
-- https://github.com/clap-rs/clap/blob/master/examples/derive_ref/README.md
+    // TODO: Make parser::rate handle ranges - prob best to create a new enum in src/cli/parser.rs?
+    // TODO: Keep fixing compile errors in src/cli/mod.rs
+    // TODO: Create ValueParser for SignallerKind
+    // TODO: Check whether the value_parser!(String) thing actually does anything

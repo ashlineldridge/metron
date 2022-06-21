@@ -1,4 +1,6 @@
-use crate::cli::validate::{self, validate};
+use clap::{ArgAction, value_parser};
+
+use crate::cli::parser;
 
 /// Creates the [`clap::Command`] for the `profile` subcommand.
 ///
@@ -38,7 +40,7 @@ fn all_args() -> Vec<clap::Arg<'static>> {
         arg_single_threaded(),
         arg_connections(),
         arg_signaller(),
-        arg_stop_on_error(),
+        arg_stop_on_client_error(),
         arg_stop_on_non_2xx(),
         arg_log_level(),
     ]
@@ -46,14 +48,17 @@ fn all_args() -> Vec<clap::Arg<'static>> {
 
 /// Returns the [`clap::ArgGroup`]s for the `profile` subcommand.
 fn all_arg_groups() -> Vec<clap::ArgGroup<'static>> {
-    vec![arg_group_payload()]
+    vec![arg_group_payload(), arg_group_thread_model()]
 }
 
-/// Returns the [`clap::ArgGroup`] for payload arguments.
-///
-/// This argument group ensures that only one payload argument is specified.
+/// Returns the [`clap::ArgGroup`] for the arguments that decide the request payload.
 fn arg_group_payload() -> clap::ArgGroup<'static> {
     clap::ArgGroup::new("group-payload").multiple(false)
+}
+
+/// Returns the [`clap::ArgGroup`] for the arguments that decide the thread model.
+fn arg_group_thread_model() -> clap::ArgGroup<'static> {
+    clap::ArgGroup::new("group-thread-model").multiple(false)
 }
 
 /// Returns the [`clap::Arg`] for `--rate`.
@@ -81,12 +86,13 @@ receive the same number of values.
 
     clap::Arg::new("rate")
         .long("rate")
-        .value_name("RATES")
+        .value_name("RATE")
         .required(true)
         .multiple_values(true)
-        .use_value_delimiter(true)
+        .multiple_occurrences(true)
         .require_value_delimiter(true)
         .value_delimiter(',')
+        .value_parser(parser::rate)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -122,12 +128,12 @@ See https://docs.rs/humantime/latest/humantime for time format details.
 
     clap::Arg::new("duration")
         .long("duration")
-        .value_name("DURATIONS")
+        .value_name("DURATION")
         .required(true)
         .multiple_values(true)
-        .use_value_delimiter(true)
         .require_value_delimiter(true)
         .value_delimiter(',')
+        .value_parser(parser::duration)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -146,8 +152,11 @@ performance test will evenly distribute requests between the targets using round
     clap::Arg::new("target")
         .long("target")
         .value_name("URL")
-        .multiple_occurrences(true)
-        .validator(validate::url)
+        .required(true)
+        .multiple_values(true)
+        .require_value_delimiter(true)
+        .value_delimiter(',')
+        .value_parser(parser::target)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -167,7 +176,7 @@ and a payload is specified then HTTP POST will be assumed.
         .long("http-method")
         .value_name("METHOD")
         .default_value("GET")
-        .possible_values(&[
+        .value_parser([
             "GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "CONNECT", "PATCH", "TRACE",
         ])
         .help(SHORT)
@@ -189,6 +198,7 @@ then an empty payload will be used.
         .long("payload")
         .group("group-payload")
         .value_name("PAYLOAD")
+        .value_parser(value_parser!(String))
         .help(SHORT)
         .long_help(LONG)
 }
@@ -208,7 +218,6 @@ then an empty payload will be used.
         .long("payload-file")
         .group("group-payload")
         .value_name("FILE")
-        .validator(validate::file)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -227,8 +236,11 @@ This argument can be specified multiple times.
     clap::Arg::new("header")
         .long("header")
         .value_name("K:V")
+        .multiple_values(true)
+        .require_value_delimiter(true)
+        .value_delimiter(',')
         .multiple_occurrences(true)
-        .validator(validate::key_value)
+        .value_parser(parser::header)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -248,8 +260,9 @@ This argument defaults to the number of cores on the host machine.
 
     clap::Arg::new("worker-threads")
         .long("worker-threads")
+        .group("group-thread-model")
         .value_name("COUNT")
-        .validator(validate::<usize>)
+        .value_parser(value_parser!(u64).range(1..1000))
         .help(SHORT)
         .long_help(LONG)
 }
@@ -271,8 +284,8 @@ This argument is incompatible with --worker-threads and --signaller=blocking.
 
     clap::Arg::new("single-threaded")
         .long("single-threaded")
-        .value_name("COUNT")
-        .validator(validate::<usize>)
+        .group("group-thread-model")
+        .action(ArgAction::SetTrue)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -290,7 +303,7 @@ TODO: Elaborate.
         .long("connections")
         .value_name("COUNT")
         .default_value("1")
-        .validator(validate::<usize>)
+        .value_parser(value_parser!(u64).range(1..))
         .help(SHORT)
         .long_help(LONG)
 }
@@ -308,27 +321,26 @@ generally be what you want.
         .long("signaller")
         .value_name("NAME")
         .default_value("blocking")
-        .possible_values(&["blocking", "cooperative"])
+        .value_parser(["blocking", "cooperative"])
         .help(SHORT)
         .long_help(LONG)
 }
 
-/// Returns the [`clap::Arg`] for `--stop-on-error`.
-fn arg_stop_on_error() -> clap::Arg<'static> {
+/// Returns the [`clap::Arg`] for `--stop-on-client-error`.
+fn arg_stop_on_client_error() -> clap::Arg<'static> {
     const SHORT: &str = "Whether to stop if on error.";
     const LONG: &str = "\
-Sets whether the profiling operation should stop if an error is encountered.
-This setting only affects real errors (e.g., too many open files) and does not
-consider HTTP status codes.
+Sets whether the profiling operation should stop if the client encounters an
+error when sending requests to the target(s). This setting only affects *client-
+side* errors (e.g., too many open files) and not HTTP error statuses returned by
+the target(s).
 
 See --stop-on-http-non-2xx for setting HTTP status stopping behaviour.
 ";
 
-    clap::Arg::new("stop-on-error")
-        .long("stop-on-error")
-        .value_name("BOOL")
-        .default_value("true")
-        .validator(validate::<bool>)
+    clap::Arg::new("stop-on-client-error")
+        .long("stop-on-client-error")
+        .action(ArgAction::SetTrue)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -340,14 +352,12 @@ fn arg_stop_on_non_2xx() -> clap::Arg<'static> {
 Sets whether the profiling operation should stop if a non-2XX HTTP status is
 retured.
 
-See --stop-on-error for setting error stopping behaviour.
+See --stop-on-client-error for setting error stopping behaviour.
 ";
 
     clap::Arg::new("stop-on-non-2xx")
         .long("stop-on-non-2xx")
-        .value_name("BOOL")
-        .default_value("false")
-        .validator(validate::<bool>)
+        .action(ArgAction::SetTrue)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -364,7 +374,7 @@ severity level will be printed.
         .long("log-level")
         .value_name("LEVEL")
         .default_value("off")
-        .possible_values(&["off", "debug", "info", "warn", "error"])
+        .value_parser(["off", "debug", "info", "warn", "error"])
         .help(SHORT)
         .long_help(LONG)
 }

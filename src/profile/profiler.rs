@@ -140,7 +140,7 @@ impl Profiler {
             backend.record(&sample).await?;
             report_builder.record(&sample)?;
 
-            if self.config.stop_on_error {
+            if self.config.stop_on_client_error {
                 if let Err(err) = sample.status {
                     Self::drain_receiver(rx).await;
                     return Err(Error::HttpRequest {

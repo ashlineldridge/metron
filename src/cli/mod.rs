@@ -1,16 +1,20 @@
+mod parser;
 mod profile;
 mod root;
 mod server;
-mod validate;
 
 use std::{
     fs::{self, File},
     io,
+    time::Duration,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
+use either::Either::{Left, Right};
 use serde::de::DeserializeOwned;
+use url::Url;
 
+use self::parser::RateArgValue;
 use crate::{
     config,
     profile::{PlanSegment, SignallerKind},
@@ -46,8 +50,8 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
         crate::profile::Config::default()
     };
 
-    let rates = matches.values_of_t::<String>("rate")?;
-    let durations = matches.values_of_t::<String>("duration")?;
+    let rates = matches.get_many::<RateArgValue>("rate").unwrap();
+    let durations = matches.get_many::<Option<Duration>>("duration").unwrap();
 
     if rates.len() != durations.len() {
         return Err(profile::command()
@@ -56,64 +60,61 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
                 "The number of --rate and --duration arguments must match",
             )
             .into());
-
-        // let mut cmd = clap::Command::new("foobar");
-        // return Err(clap::Error::raw(
-        //     clap::ErrorKind::Format,
-        //     "The number of --rate and --duration arguments must match",
-        // )
-        // .format(&mut cmd)
-        // .into());
-        // bail!("The number of --rate and --duration arguments must match");
     }
 
-    for (rate, duration) in rates.into_iter().zip(durations) {
-        let duration = if duration == "forever" {
-            None
-        } else {
-            let duration = duration.parse::<humantime::Duration>()?;
-            Some(duration.into())
-        };
+    let mut it = rates.zip(durations).peekable();
+    while let Some((&rate, &duration)) = it.next() {
+        // Check that only the last duration value is infinite.
+        if duration.is_none() && it.peek().is_some() {
+            return Err(profile::command()
+                .error(
+                    clap::ErrorKind::ValueValidation,
+                    "Only the last --duration value can be \"forever\"",
+                )
+                .into());
+        }
 
-        let segment = if let Some((rate_start, rate_end)) = rate.split_once(':') {
-            if let Some(duration) = duration {
-                let rate_start = rate_start.parse()?;
-                let rate_end = rate_end.parse()?;
-                PlanSegment::Linear {
-                    rate_start,
-                    rate_end,
-                    duration,
+        let segment = match rate {
+            Left(rate) => PlanSegment::Fixed { rate, duration },
+            Right((rate_start, rate_end)) => {
+                if let Some(duration) = duration {
+                    PlanSegment::Linear {
+                        rate_start,
+                        rate_end,
+                        duration,
+                    }
+                } else {
+                    return Err(profile::command()
+                        .error(
+                            clap::ErrorKind::ValueValidation,
+                            "Only fixed-rate segments may have a --duration value can be \"forever\"",
+                        )
+                        .into());
                 }
-            } else {
-                bail!("A finite duration must be used when the rate varies over time");
             }
-        } else {
-            let rate = rate.parse()?;
-            PlanSegment::Fixed { rate, duration }
         };
 
         config.segments.push(segment);
     }
 
-    config.connections = matches.value_of_t_or_exit("connections");
-    config.http_method = matches.value_of_t_or_exit("http-method");
-    config.targets = if matches.is_present("target") {
-        vec![matches.value_of_t_or_exit("target")]
-    } else {
-        matches.values_of_t_or_exit("multi-target")
-    };
+    config.connections = *matches.get_one::<u64>("connections").unwrap() as usize;
+    config.http_method = matches.get_one::<String>("http-method").unwrap().clone();
+    config.targets = matches
+        .get_many::<Url>("target")
+        .unwrap()
+        .cloned()
+        .collect::<Vec<_>>();
 
-    config.headers = if matches.is_present("header") {
-        matches.values_of_t_or_exit("header")
-    } else {
-        vec![]
-    };
+    config.headers = matches
+        .get_many("header")
+        .unwrap_or_default()
+        .cloned()
+        .collect();
 
-    config.payload = if matches.is_present("payload") {
-        Some(matches.value_of_t_or_exit("payload"))
-    } else if matches.is_present("payload-file") {
-        let file = matches.value_of_t_or_exit::<String>("payload-file");
-        let payload = fs::read_to_string(file).unwrap();
+    config.payload = if let Some(payload) = matches.get_one::<String>("payload") {
+        Some(payload.to_owned())
+    } else if let Some(file) = matches.get_one::<String>("payload-file") {
+        let payload = fs::read_to_string(file)?;
         Some(payload)
     } else {
         None
@@ -121,15 +122,14 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
 
     config.runtime = parse_runtime_config(matches)?;
 
-    config.signaller_kind = match matches.value_of("signaller").unwrap() {
-        "blocking" => SignallerKind::Blocking,
-        "cooperative" => SignallerKind::Cooperative,
-        s => panic!("Invalid signaller: {}", s),
+    config.signaller_kind = match matches.get_one::<String>("signaller").map(String::as_str) {
+        Some("cooperative") => SignallerKind::Cooperative,
+        _ => SignallerKind::Blocking,
     };
 
-    config.stop_on_error = matches.value_of_t_or_exit("stop-on-error");
-    config.stop_on_non_2xx = matches.value_of_t_or_exit("stop-on-non-2xx");
-    config.log_level = matches.value_of_t_or_exit("log-level");
+    config.stop_on_client_error = *matches.get_one("stop-on-client-error").unwrap();
+    config.stop_on_non_2xx = *matches.get_one("stop-on-non-2xx").unwrap();
+    config.log_level = matches.get_one::<String>("log-level").unwrap().parse()?;
 
     Ok(config)
 }
@@ -145,18 +145,20 @@ fn parse_server_config(matches: &clap::ArgMatches) -> Result<crate::server::Conf
 
     config.runtime = parse_runtime_config(matches)?;
 
-    config.port = matches.value_of_t_or_exit("port");
-    config.log_level = matches.value_of_t_or_exit("log-level");
+    config.port = *matches.get_one("port").unwrap();
+    config.log_level = matches.get_one::<String>("log-level").unwrap().parse()?;
 
     Ok(config)
 }
 
 fn parse_runtime_config(matches: &clap::ArgMatches) -> Result<runtime::Config> {
-    let config = if matches.is_present("worker-threads") {
-        let worker_threads = matches.value_of_t_or_exit("worker-threads");
+    let config = if let Some(worker_threads) = matches
+        .get_one::<u64>("worker-threads")
+        .map(|v| *v as usize)
+    {
         runtime::Config { worker_threads }
     } else {
-        Default::default()
+        runtime::Config::default()
     };
 
     Ok(config)
@@ -167,7 +169,7 @@ fn parse_config_file<T>(matches: &clap::ArgMatches) -> Result<Option<T>>
 where
     T: DeserializeOwned,
 {
-    let config = match matches.value_of("config-file") {
+    let config = match matches.get_one::<String>("config-file") {
         Some(f) if f == "-" => {
             let d = serde_yaml::from_reader(io::stdin())
                 .context("Error parsing YAML configuration from stdin")?;
