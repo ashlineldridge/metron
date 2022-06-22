@@ -46,10 +46,10 @@ impl Profiler {
 
     pub async fn run(&self) -> Result<Report, Error> {
         let target_urls = self.config.targets.clone();
-        let target_uris: Vec<Uri> = target_urls
+        let target_uris = target_urls
             .iter()
             .map(|uri| uri.to_string().parse::<hyper::Uri>().unwrap())
-            .collect();
+            .collect::<Vec<Uri>>();
 
         let http_method: hyper::Method = self
             .config
@@ -133,7 +133,7 @@ impl Profiler {
     }
 
     async fn build_report(&self, mut rx: mpsc::Receiver<Sample>) -> Result<Report, Error> {
-        let mut report_builder = report::Builder::new();
+        let mut report_builder = report::Builder::new(true);
 
         let mut backend = metrics::Backend {};
         while let Some(sample) = rx.recv().await {

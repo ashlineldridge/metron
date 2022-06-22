@@ -18,7 +18,7 @@ MPSC Channel --> Control Task --> Plan
 - Think about cli/ package structure, file names, etc
 - Add CLI tests
 
-    // TODO: Make parser::rate handle ranges - prob best to create a new enum in src/cli/parser.rs?
-    // TODO: Keep fixing compile errors in src/cli/mod.rs
     // TODO: Create ValueParser for SignallerKind
     // TODO: Check whether the value_parser!(String) thing actually does anything
+
+// TODO: Add --correct-latencies = true arg

@@ -42,10 +42,10 @@ async fn run_profile(config: &profile::Config) -> Result<()> {
     let profiler = Profiler::new(config.clone());
     let report = profiler.run().await;
     match report {
-        Ok(ref report) => print_report(report),
+        Ok(ref report) => print_report(report)?,
         Err(ref err) => {
             if let Some(report) = err.partial_report() {
-                print_report(report);
+                print_report(report)?;
             }
         }
     }
@@ -59,6 +59,7 @@ async fn run_server(config: &server::Config) -> Result<()> {
     server::serve(config).await
 }
 
-fn print_report(report: &profile::Report) {
-    println!("{:?}\n", report);
+fn print_report(report: &profile::Report) -> Result<()> {
+    println!("{}", serde_yaml::to_string(report)?);
+    Ok(())
 }
