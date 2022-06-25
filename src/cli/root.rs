@@ -20,8 +20,6 @@ pub fn command() -> clap::Command<'static> {
         .arg_required_else_help(true)
         .subcommands(all_subcommands())
         .subcommand_required(true)
-        // .propagate_version(true)
-        // .mut_arg("version", |a| a.short('v'))
 }
 
 fn all_subcommands() -> Vec<clap::Command<'static>> {

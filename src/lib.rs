@@ -1,11 +1,11 @@
 use std::{ops::Deref, str::FromStr, time::Duration};
 
-use log::LevelFilter;
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
 #[serde(transparent)]
-pub struct Rate(pub u32);
+pub struct Rate(u32);
 
 impl Rate {
     pub fn as_interval(&self) -> Duration {
@@ -35,24 +35,24 @@ impl FromStr for Rate {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
 #[serde(rename_all = "lowercase")]
 pub enum LogLevel {
     Off,
-    Error,
-    Warn,
     Info,
     Debug,
+    Warn,
+    Error,
 }
 
-impl LogLevel {
-    pub fn as_filter(&self) -> LevelFilter {
-        match self {
-            LogLevel::Off => LevelFilter::Off,
-            LogLevel::Error => LevelFilter::Error,
-            LogLevel::Warn => LevelFilter::Warn,
-            LogLevel::Info => LevelFilter::Info,
-            LogLevel::Debug => LevelFilter::Debug,
+impl From<LogLevel> for log::LevelFilter {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Off => log::LevelFilter::Off,
+            LogLevel::Error => log::LevelFilter::Error,
+            LogLevel::Warn => log::LevelFilter::Warn,
+            LogLevel::Info => log::LevelFilter::Info,
+            LogLevel::Debug => log::LevelFilter::Debug,
         }
     }
 }
@@ -63,16 +63,44 @@ impl Default for LogLevel {
     }
 }
 
-impl FromStr for LogLevel {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(serde_yaml::from_str(s)?)
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Header {
     pub name: String,
     pub value: String,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum HttpMethod {
+    Get,
+    Post,
+    Put,
+    Patch,
+    Delete,
+    Head,
+    Options,
+    Trace,
+    Connect,
+}
+
+impl From<HttpMethod> for hyper::Method {
+    fn from(method: HttpMethod) -> Self {
+        match method {
+            HttpMethod::Get => hyper::Method::GET,
+            HttpMethod::Post => hyper::Method::POST,
+            HttpMethod::Put => hyper::Method::PUT,
+            HttpMethod::Patch => hyper::Method::PATCH,
+            HttpMethod::Delete => hyper::Method::DELETE,
+            HttpMethod::Head => hyper::Method::HEAD,
+            HttpMethod::Options => hyper::Method::OPTIONS,
+            HttpMethod::Trace => hyper::Method::TRACE,
+            HttpMethod::Connect => hyper::Method::CONNECT,
+        }
+    }
+}
+
+impl Default for HttpMethod {
+    fn default() -> Self {
+        Self::Get
+    }
 }

@@ -1,4 +1,5 @@
 use clap::value_parser;
+use metron::LogLevel;
 
 /// Creates the [`clap::Command`] for the `server` subcommand.
 ///
@@ -20,6 +21,7 @@ responses, latency, and other properties.
         .long_about(LONG)
         .args(all_args())
         .groups(all_arg_groups())
+        .disable_version_flag(true)
 }
 
 /// Returns all [`clap::Arg`]s for the `server` subcommand.
@@ -44,7 +46,7 @@ severity level will be printed.
         .long("log-level")
         .value_name("LEVEL")
         .default_value("info")
-        .value_parser(["off", "debug", "info", "warn", "error"])
+        .value_parser(value_parser!(LogLevel))
         .help(SHORT)
         .long_help(LONG)
 }

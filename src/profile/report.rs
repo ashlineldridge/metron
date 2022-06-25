@@ -17,6 +17,7 @@ pub struct Report {
     pub error_latency: Vec<ReportSection>,
     pub request_delay: Vec<ReportSection>,
     pub total_requests: usize,
+    #[serde(with = "humantime_serde")]
     pub total_duration: Duration,
 }
 
@@ -41,8 +42,8 @@ type Histogram = hdrhistogram::Histogram<u64>;
 
 /// Builder used to construct a [Report].
 pub struct Builder {
-    /// Whether latencies should be corrected to account for coordinated omission.
-    enable_correction: bool,
+    /// Whether latency correction is disabled.
+    no_latency_correction: bool,
 
     /// When we started building the report.
     start: Instant,
@@ -60,9 +61,9 @@ pub struct Builder {
 }
 
 impl Builder {
-    pub fn new(enable_correction: bool) -> Self {
+    pub fn new(no_latency_correction: bool) -> Self {
         Self {
-            enable_correction,
+            no_latency_correction,
             start: Instant::now(),
             response_histograms: HashMap::new(),
             error_histograms: HashMap::new(),
@@ -81,10 +82,10 @@ impl Builder {
                 .or_insert_with(Self::new_histogram)
         };
 
-        let latency = if self.enable_correction {
-            sample.corrected_latency().as_micros().try_into()?
-        } else {
+        let latency = if self.no_latency_correction {
             sample.actual_latency().as_micros().try_into()?
+        } else {
+            sample.corrected_latency().as_micros().try_into()?
         };
 
         hist.record(latency)?;
@@ -106,10 +107,13 @@ impl Builder {
             response_latency.push(ReportSection {
                 target: Some(url.clone()),
                 status_code: Some(status),
-                percentiles: STANDARD_PERCENTILES.iter().map(|&p| ReportPercentile {
-                    percentile: p,
-                    duration: Duration::from_micros(hist.value_at_percentile(p)),
-                }).collect(),
+                percentiles: STANDARD_PERCENTILES
+                    .iter()
+                    .map(|&p| ReportPercentile {
+                        percentile: p,
+                        duration: Duration::from_micros(hist.value_at_percentile(p)),
+                    })
+                    .collect(),
                 total_requests: hist.len() as usize,
             });
         }
@@ -119,10 +123,13 @@ impl Builder {
             error_latency.push(ReportSection {
                 target: Some(url.clone()),
                 status_code: None,
-                percentiles: STANDARD_PERCENTILES.iter().map(|&p| ReportPercentile {
-                    percentile: p,
-                    duration: Duration::from_micros(hist.value_at_percentile(p)),
-                }).collect(),
+                percentiles: STANDARD_PERCENTILES
+                    .iter()
+                    .map(|&p| ReportPercentile {
+                        percentile: p,
+                        duration: Duration::from_micros(hist.value_at_percentile(p)),
+                    })
+                    .collect(),
                 total_requests: hist.len() as usize,
             });
         }
@@ -133,10 +140,13 @@ impl Builder {
             request_delay.push(ReportSection {
                 target: Some(url.clone()),
                 status_code: None,
-                percentiles: STANDARD_PERCENTILES.iter().map(|&p| ReportPercentile {
-                    percentile: p,
-                    duration: Duration::from_micros(hist.value_at_percentile(p)),
-                }).collect(),
+                percentiles: STANDARD_PERCENTILES
+                    .iter()
+                    .map(|&p| ReportPercentile {
+                        percentile: p,
+                        duration: Duration::from_micros(hist.value_at_percentile(p)),
+                    })
+                    .collect(),
                 total_requests: hist.len() as usize,
             });
 
@@ -150,7 +160,6 @@ impl Builder {
             total_requests,
             total_duration: self.start.elapsed(),
         }
-
     }
 
     fn new_histogram() -> Histogram {

@@ -1,6 +1,5 @@
 use std::time::{Duration, Instant};
 
-use anyhow::Context;
 use hyper::{Client, Uri};
 use hyper_tls::HttpsConnector;
 use thiserror::Error;
@@ -51,11 +50,7 @@ impl Profiler {
             .map(|uri| uri.to_string().parse::<hyper::Uri>().unwrap())
             .collect::<Vec<Uri>>();
 
-        let http_method: hyper::Method = self
-            .config
-            .http_method
-            .parse()
-            .context("Invalid HTTP method")?;
+        let http_method: hyper::Method = self.config.http_method.into();
 
         let payload = self.config.payload.clone().unwrap_or_default();
 
@@ -133,7 +128,7 @@ impl Profiler {
     }
 
     async fn build_report(&self, mut rx: mpsc::Receiver<Sample>) -> Result<Report, Error> {
-        let mut report_builder = report::Builder::new(true);
+        let mut report_builder = report::Builder::new(self.config.no_latency_correction);
 
         let mut backend = metrics::Backend {};
         while let Some(sample) = rx.recv().await {

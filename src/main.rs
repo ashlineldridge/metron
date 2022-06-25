@@ -20,7 +20,7 @@ fn try_main() -> Result<()> {
     let config = crate::cli::parse()?;
 
     env_logger::builder()
-        .filter_level(config.log_level().as_filter())
+        .filter_level(config.log_level().into())
         .init();
 
     let runtime = runtime::build(config.runtime())?;

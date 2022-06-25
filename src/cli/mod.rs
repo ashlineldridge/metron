@@ -15,11 +15,7 @@ use serde::de::DeserializeOwned;
 use url::Url;
 
 use self::parser::RateArgValue;
-use crate::{
-    config,
-    profile::{PlanSegment, SignallerKind},
-    runtime,
-};
+use crate::{config, profile::PlanSegment, runtime};
 
 /// Parses the CLI arguments into a [`Config`][config::Config] struct.
 ///
@@ -98,7 +94,7 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
     }
 
     config.connections = *matches.get_one::<u64>("connections").unwrap() as usize;
-    config.http_method = matches.get_one::<String>("http-method").unwrap().clone();
+    config.http_method = *matches.get_one("http-method").unwrap();
     config.targets = matches
         .get_many::<Url>("target")
         .unwrap()
@@ -122,14 +118,23 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
 
     config.runtime = parse_runtime_config(matches)?;
 
-    config.signaller_kind = match matches.get_one::<String>("signaller").map(String::as_str) {
-        Some("cooperative") => SignallerKind::Cooperative,
-        _ => SignallerKind::Blocking,
-    };
-
+    config.signaller_kind = *matches.get_one("signaller").unwrap();
+    config.no_latency_correction = *matches.get_one("no-latency-correction").unwrap();
     config.stop_on_client_error = *matches.get_one("stop-on-client-error").unwrap();
     config.stop_on_non_2xx = *matches.get_one("stop-on-non-2xx").unwrap();
-    config.log_level = matches.get_one::<String>("log-level").unwrap().parse()?;
+    config.log_level = *matches.get_one("log-level").unwrap();
+
+    // Ensure that we haven't been requested to create a single-threaded runtime with a
+    // blocking signaller. This combination is not possible as the blocking signaller uses
+    // a separate blocking thread to generate signal timing.
+    if config.runtime.is_single_threaded() && config.signaller_kind.is_blocking() {
+        return Err(profile::command()
+            .error(
+                clap::ErrorKind::ArgumentConflict,
+                "Use of a single-threaded runtime is not compatible with a blocking signaller",
+            )
+            .into());
+    }
 
     Ok(config)
 }
@@ -146,17 +151,18 @@ fn parse_server_config(matches: &clap::ArgMatches) -> Result<crate::server::Conf
     config.runtime = parse_runtime_config(matches)?;
 
     config.port = *matches.get_one("port").unwrap();
-    config.log_level = matches.get_one::<String>("log-level").unwrap().parse()?;
+    config.log_level = *matches.get_one("log-level").unwrap();
 
     Ok(config)
 }
 
 fn parse_runtime_config(matches: &clap::ArgMatches) -> Result<runtime::Config> {
-    let config = if let Some(worker_threads) = matches
-        .get_one::<u64>("worker-threads")
-        .map(|v| *v as usize)
-    {
-        runtime::Config { worker_threads }
+    let config = if *matches.get_one("single-threaded").unwrap() {
+        runtime::Config::SingleThreaded
+    } else if let Some(worker_threads) = matches.get_one::<u64>("worker-threads") {
+        runtime::Config::MultiThreaded {
+            worker_threads: *worker_threads as usize,
+        }
     } else {
         runtime::Config::default()
     };

@@ -1,6 +1,7 @@
-use clap::{ArgAction, value_parser};
+use clap::{value_parser, ArgAction};
+use metron::{HttpMethod, LogLevel};
 
-use crate::cli::parser;
+use crate::{cli::parser, profile::SignallerKind};
 
 /// Creates the [`clap::Command`] for the `profile` subcommand.
 ///
@@ -24,6 +25,7 @@ The report can be written to stdout and/or streamed to a metrics backend.
         .long_about(LONG)
         .args(all_args())
         .groups(all_arg_groups())
+        .disable_version_flag(true)
 }
 
 /// Returns all [`clap::Arg`]s for the `profile` subcommand.
@@ -40,6 +42,7 @@ fn all_args() -> Vec<clap::Arg<'static>> {
         arg_single_threaded(),
         arg_connections(),
         arg_signaller(),
+        arg_no_latency_correction(),
         arg_stop_on_client_error(),
         arg_stop_on_non_2xx(),
         arg_log_level(),
@@ -175,10 +178,8 @@ and a payload is specified then HTTP POST will be assumed.
     clap::Arg::new("http-method")
         .long("http-method")
         .value_name("METHOD")
-        .default_value("GET")
-        .value_parser([
-            "GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "CONNECT", "PATCH", "TRACE",
-        ])
+        .default_value("get")
+        .value_parser(value_parser!(HttpMethod))
         .help(SHORT)
         .long_help(LONG)
 }
@@ -321,7 +322,26 @@ generally be what you want.
         .long("signaller")
         .value_name("NAME")
         .default_value("blocking")
-        .value_parser(["blocking", "cooperative"])
+        .value_parser(value_parser!(SignallerKind))
+        .help(SHORT)
+        .long_help(LONG)
+}
+
+/// Returns the [`clap::Arg`] for `--no-latency-correction`.
+fn arg_no_latency_correction() -> clap::Arg<'static> {
+    const SHORT: &str = "Disables latency correction.";
+    const LONG: &str = "\
+Disables latency correction that accounts for coordinated omission.
+
+When latency correction is enabled, the latency that is recorded for each
+request is calculated from when the request was scheduled to be sent, rather
+than when it was actually sent. This helps to account for the phenomenon
+known as \"Coordinated Omission\". Latency correction is enabled by defeault.
+";
+
+    clap::Arg::new("no-latency-correction")
+        .long("no-latency-correction")
+        .action(ArgAction::SetTrue)
         .help(SHORT)
         .long_help(LONG)
 }
@@ -374,7 +394,7 @@ severity level will be printed.
         .long("log-level")
         .value_name("LEVEL")
         .default_value("off")
-        .value_parser(["off", "debug", "info", "warn", "error"])
+        .value_parser(value_parser!(LogLevel))
         .help(SHORT)
         .long_help(LONG)
 }
