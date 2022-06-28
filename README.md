@@ -17,8 +17,3 @@ MPSC Channel --> Control Task --> Plan
 - Check that the long help messages are just as helpful in terms of hints for enums (e.g., --log-level), range options (e.g., )
 - Think about cli/ package structure, file names, etc
 - Add CLI tests
-
-    // TODO: Create ValueParser for SignallerKind
-    // TODO: Check whether the value_parser!(String) thing actually does anything
-
-// TODO: Add --correct-latencies = true arg

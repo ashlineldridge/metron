@@ -7,6 +7,8 @@ mod runtime;
 mod server;
 mod wait;
 
+use std::env;
+
 use anyhow::{Context, Result};
 use config::Config;
 
@@ -17,7 +19,7 @@ fn main() -> Result<()> {
 }
 
 fn try_main() -> Result<()> {
-    let config = crate::cli::parse()?;
+    let config = crate::cli::parse(env::args_os())?;
 
     env_logger::builder()
         .filter_level(config.log_level().into())

@@ -2,6 +2,7 @@ use metron::LogLevel;
 
 use crate::runtime;
 
+#[derive(Clone, Debug)]
 pub enum Config {
     Profile(crate::profile::Config),
     Server(crate::server::Config),

@@ -134,6 +134,7 @@ See https://docs.rs/humantime/latest/humantime for time format details.
         .value_name("DURATION")
         .required(true)
         .multiple_values(true)
+        .multiple_occurrences(true)
         .require_value_delimiter(true)
         .value_delimiter(',')
         .value_parser(parser::duration)

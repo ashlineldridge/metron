@@ -77,7 +77,14 @@ arguments.
         .long_help(LONG)
 }
 
-#[test]
-fn verify_command() {
-    command().debug_assert();
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_root_command() {
+        // Clap documentation recommends running the following to perform some basic
+        // assertions on the top-level command.
+        command().debug_assert();
+    }
 }

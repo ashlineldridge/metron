@@ -4,26 +4,38 @@ mod root;
 mod server;
 
 use std::{
+    ffi::OsString,
     fs::{self, File},
     io,
     time::Duration,
 };
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use either::Either::{Left, Right};
 use serde::de::DeserializeOwned;
+use thiserror::Error;
 use url::Url;
 
 use self::parser::RateArgValue;
 use crate::{config, profile::PlanSegment, runtime};
 
+#[derive(Error, Debug)]
+#[non_exhaustive]
+pub enum Error {
+    #[error(transparent)]
+    InvalidCli(#[from] clap::Error),
+
+    #[error(transparent)]
+    Unexpected(#[from] anyhow::Error),
+}
+
 /// Parses the CLI arguments into a [`Config`][config::Config] struct.
-///
-/// This function will exit and print an appropriate help message if the
-/// supplied command-line arguments are invalid. The returned [clap::ArgMatches]
-/// is guaranteed to be valid (anything less should be considered a bug).
-pub fn parse() -> Result<config::Config> {
-    let matches = root::command().try_get_matches()?;
+pub fn parse<I, T>(it: I) -> Result<config::Config, Error>
+where
+    I: IntoIterator<Item = T>,
+    T: Into<OsString> + Clone,
+{
+    let matches = root::command().try_get_matches_from(it)?;
 
     // Construct the config based on the provided subcommand. We use `unwrap` and
     // `panic!` as if we were to encounter these it'd mean we've misconfigured clap.
@@ -37,7 +49,7 @@ pub fn parse() -> Result<config::Config> {
     Ok(config)
 }
 
-fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Config> {
+fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Config, Error> {
     // Deserialize the config file if one was specified. Additional command line
     // options are then applied on top.
     let mut config = if let Some(config) = parse_config_file(matches)? {
@@ -110,7 +122,7 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
     config.payload = if let Some(payload) = matches.get_one::<String>("payload") {
         Some(payload.to_owned())
     } else if let Some(file) = matches.get_one::<String>("payload-file") {
-        let payload = fs::read_to_string(file)?;
+        let payload = fs::read_to_string(file).context("Error reading payload file")?;
         Some(payload)
     } else {
         None
@@ -139,7 +151,7 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
     Ok(config)
 }
 
-fn parse_server_config(matches: &clap::ArgMatches) -> Result<crate::server::Config> {
+fn parse_server_config(matches: &clap::ArgMatches) -> Result<crate::server::Config, Error> {
     // Deserialize the config file if one was specified. Additional command line
     // options are then applied on top.
     let mut config = if let Some(config) = parse_config_file(matches)? {
@@ -156,7 +168,7 @@ fn parse_server_config(matches: &clap::ArgMatches) -> Result<crate::server::Conf
     Ok(config)
 }
 
-fn parse_runtime_config(matches: &clap::ArgMatches) -> Result<runtime::Config> {
+fn parse_runtime_config(matches: &clap::ArgMatches) -> Result<runtime::Config, Error> {
     let config = if *matches.get_one("single-threaded").unwrap() {
         runtime::Config::SingleThreaded
     } else if let Some(worker_threads) = matches.get_one::<u64>("worker-threads") {
@@ -171,7 +183,7 @@ fn parse_runtime_config(matches: &clap::ArgMatches) -> Result<runtime::Config> {
 }
 
 /// Parses the config file if one has been specified.
-fn parse_config_file<T>(matches: &clap::ArgMatches) -> Result<Option<T>>
+fn parse_config_file<T>(matches: &clap::ArgMatches) -> Result<Option<T>, Error>
 where
     T: DeserializeOwned,
 {
@@ -182,7 +194,9 @@ where
             Some(d)
         }
         Some(f) => {
-            let d = serde_yaml::from_reader(File::open(f)?)
+            let file =
+                File::open(f).context(format!("Error opening YAML configuration file: {}", f))?;
+            let d = serde_yaml::from_reader(file)
                 .context(format!("Error parsing YAML configuration file: {}", f))?;
             Some(d)
         }
@@ -190,4 +204,105 @@ where
     };
 
     Ok(config)
+}
+
+#[cfg(test)]
+mod profile_tests {
+    use clap::{
+        error::{ContextKind, ContextValue},
+        ErrorKind,
+    };
+
+    use super::*;
+
+    #[test]
+    fn minimal_required_args() {
+        // Specify the minimal required arguments.
+        let args = [
+            "metron",
+            "profile",
+            "--rate=500",
+            "--duration=30s",
+            "--target=https://example.com",
+        ];
+
+        parse(args).unwrap();
+    }
+
+    #[test]
+    fn missing_required_args() {
+        // Invocation is missing all arguments so we expect an error to be returned. The
+        // error should contain a report of the missing arguments.
+        let args = ["metron", "profile"];
+
+        let err = parse(args).unwrap_err();
+        if let Error::InvalidCli(inner) = err {
+            let (ctx_kind, ctx_value) = inner.context().next().unwrap();
+
+            assert_eq!(inner.kind, ErrorKind::MissingRequiredArgument);
+            assert_eq!(ctx_kind, ContextKind::InvalidArg);
+            assert_eq!(
+                ctx_value,
+                &ContextValue::Strings(
+                    vec![
+                        "--rate <RATE>...",
+                        "--duration <DURATION>...",
+                        "--target <URL>...",
+                    ]
+                    .into_iter()
+                    .map(ToString::to_string)
+                    .collect()
+                )
+            );
+        } else {
+            panic!("Expected Error::InvalidCli error but got: {:?}", err);
+        }
+    }
+
+    #[test]
+    fn multi_segment_plan_single_arg() {
+        // Specify a multi-segment test plan by passing a list of rates and a list of
+        // duration values using a comma separator.
+        let args = [
+            "metron",
+            "profile",
+            "--rate=10:1000,1000",
+            "--duration=5m,forever",
+            "--target=https://example.com",
+        ];
+
+        parse(args).unwrap();
+    }
+
+    #[test]
+    fn multi_segment_plan_multi_arg() {
+        // Specify a multi-segment test plan by passing multiple rate and duration arguments.
+        let args = [
+            "metron",
+            "profile",
+            "--rate=10:1000",
+            "--rate=1000",
+            "--duration=5m",
+            "--duration=forever",
+            "--target=https://example.com",
+        ];
+
+        parse(args).unwrap();
+    }
+
+    #[test]
+    fn multi_segment_plan_missing_duration_value() {
+        // Specify a multi-segment test plan with a mismatching number of rates and durations.
+        let args = [
+            "metron",
+            "profile",
+            "--rate=10:1000,1000",
+            "--duration=5m",
+            "--target=https://example.com",
+        ];
+
+        let err = parse(args).unwrap_err();
+
+        dbg!(&err);
+    }
 }

@@ -1,10 +1,11 @@
 use std::{ops::Deref, str::FromStr, time::Duration};
 
+use anyhow::bail;
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
-#[serde(transparent)]
+#[serde(try_from = "String")]
 pub struct Rate(u32);
 
 impl Rate {
@@ -28,10 +29,26 @@ impl Deref for Rate {
 }
 
 impl FromStr for Rate {
-    type Err = std::num::ParseIntError;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> core::result::Result<Self, Self::Err> {
-        Ok(Rate(u32::from_str(s)?))
+        Rate::try_from(s.to_owned())
+    }
+}
+
+/// This `TryFrom` implementation provides a simple means of validating rate values without
+/// needing to provide a custom `Deserialize` implementation. See also other examples here:
+/// https://github.com/serde-rs/serde/issues/939.
+impl TryFrom<String> for Rate {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let rate = value.parse()?;
+        if rate == 0 {
+            bail!("Request rate cannot be zero");
+        }
+
+        Ok(Rate(rate))
     }
 }
 
