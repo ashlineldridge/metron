@@ -8,10 +8,6 @@ use url::Url;
 
 use super::{metrics, plan, report, Config, Report, Signaller};
 
-pub struct Profiler {
-    config: Config,
-}
-
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
@@ -36,6 +32,10 @@ impl Error {
             _ => None,
         }
     }
+}
+
+pub struct Profiler {
+    config: Config,
 }
 
 impl Profiler {

@@ -93,11 +93,11 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
                     }
                 } else {
                     return Err(profile::command()
-                        .error(
-                            clap::ErrorKind::ValueValidation,
-                            "Only fixed-rate segments may have a --duration value can be \"forever\"",
-                        )
-                        .into());
+                            .error(
+                                clap::ErrorKind::ValueValidation,
+                                "Only fixed-rate segments may have a --duration value can be \"forever\"",
+                            )
+                            .into());
                 }
             }
         };
@@ -291,7 +291,7 @@ mod profile_tests {
     }
 
     #[test]
-    fn multi_segment_plan_missing_duration_value() {
+    fn multi_segment_plan_with_rate_duration_mismatch() {
         // Specify a multi-segment test plan with a mismatching number of rates and durations.
         let args = [
             "metron",
@@ -301,8 +301,24 @@ mod profile_tests {
             "--target=https://example.com",
         ];
 
+        // TODO: Assert that the error is as expected.
         let err = parse(args).unwrap_err();
+        dbg!(&err);
+    }
 
+    #[test]
+    fn invalid_rate_value() {
+        // Specify a multi-segment test plan with a mismatching number of rates and durations.
+        let args = [
+            "metron",
+            "profile",
+            "--rate=10x10",
+            "--duration=5m",
+            "--target=https://example.com",
+        ];
+
+        // TODO: Assert that the error is as expected.
+        let err = parse(args).unwrap_err();
         dbg!(&err);
     }
 }
