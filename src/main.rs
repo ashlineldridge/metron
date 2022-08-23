@@ -15,11 +15,10 @@ use config::Config;
 use crate::profile::Profiler;
 
 fn main() -> Result<()> {
-    try_main()
-}
-
-fn try_main() -> Result<()> {
-    let config = crate::cli::parse(env::args_os())?;
+    let config = match cli::parse(env::args_os()) {
+        Err(cli::Error::InvalidCli(err)) => err.exit(),
+        x => x,
+    }?;
 
     env_logger::builder()
         .filter_level(config.log_level().into())
