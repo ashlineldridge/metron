@@ -169,7 +169,7 @@ fn parse_server_config(matches: &clap::ArgMatches) -> Result<crate::server::Conf
 }
 
 fn parse_runtime_config(matches: &clap::ArgMatches) -> Result<runtime::Config, Error> {
-    let config = if *matches.get_one("single-threaded").unwrap() {
+    let config = if *matches.get_one::<bool>("single-threaded").unwrap() {
         runtime::Config::SingleThreaded
     } else if let Some(worker_threads) = matches.get_one::<u64>("worker-threads") {
         runtime::Config::MultiThreaded {

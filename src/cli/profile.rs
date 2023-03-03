@@ -383,6 +383,8 @@ See --stop-on-client-error for setting error stopping behaviour.
         .long_help(LONG)
 }
 
+// TODO: Reorganize args at both global level (e.g. this should prob be one) and across
+// this file and server.rs as there's a bit of repetition.
 /// Returns the [`clap::Arg`] for `--log-level`.
 fn arg_log_level() -> clap::Arg<'static> {
     const SHORT: &str = "Minimum logging level.";
