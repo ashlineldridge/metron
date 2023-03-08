@@ -9,20 +9,19 @@ Project home: https://github.com/ashlineldridge/metron
 ";
 
 /// Returns the root [`clap::Command`] for the application.
-pub fn command() -> clap::Command<'static> {
+pub fn command() -> clap::Command {
     use clap::*;
 
     Command::new("metron")
         .author(crate_authors!())
         .version(crate_version!())
         .about(ABOUT)
-        .global_setting(AppSettings::DeriveDisplayOrder)
         .arg_required_else_help(true)
         .subcommands(all_subcommands())
         .subcommand_required(true)
 }
 
-fn all_subcommands() -> Vec<clap::Command<'static>> {
+fn all_subcommands() -> Vec<clap::Command> {
     vec![profile::command(), server::command()]
         .into_iter()
         .map(|c| c.args(common_args()).groups(common_arg_groups()))
@@ -30,17 +29,17 @@ fn all_subcommands() -> Vec<clap::Command<'static>> {
 }
 
 /// Returns all [`clap::Arg`]s for the root command.
-fn common_args() -> Vec<clap::Arg<'static>> {
+fn common_args() -> Vec<clap::Arg> {
     vec![arg_config_file(), arg_print_config()]
 }
 
 /// Returns the [`clap::ArgGroup`]s for the root command.
-fn common_arg_groups() -> Vec<clap::ArgGroup<'static>> {
+fn common_arg_groups() -> Vec<clap::ArgGroup> {
     vec![]
 }
 
 /// Returns the [`clap::Arg`] for `--config-file`.
-fn arg_config_file() -> clap::Arg<'static> {
+fn arg_config_file() -> clap::Arg {
     const SHORT: &str = "Configuration file.";
     const LONG: &str = "\
 All commands allow a configuration file to be used as an alternative to
@@ -62,7 +61,7 @@ See --print-config for bootstrapping a configuration file.
 }
 
 /// Returns the [`clap::Arg`] for `--print-config`.
-fn arg_print_config() -> clap::Arg<'static> {
+fn arg_print_config() -> clap::Arg {
     const SHORT: &str = "Prints the configuration.";
     const LONG: &str = "\
 Generates the configuration for this command and prints it to stdout. This may

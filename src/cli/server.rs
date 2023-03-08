@@ -7,7 +7,7 @@ use metron::LogLevel;
 /// ```bash
 /// metron server --port 8080
 /// ```
-pub(crate) fn command() -> clap::Command<'static> {
+pub(crate) fn command() -> clap::Command {
     const SHORT: &str = "Runs an echo server.";
     const LONG: &str = "\
 Runs an echo server that may be used within performance profile tests.
@@ -25,7 +25,7 @@ responses, latency, and other properties.
 }
 
 /// Returns all [`clap::Arg`]s for the `server` subcommand.
-fn all_args() -> Vec<clap::Arg<'static>> {
+fn all_args() -> Vec<clap::Arg> {
     vec![
         arg_log_level(),
         arg_port(),
@@ -35,12 +35,12 @@ fn all_args() -> Vec<clap::Arg<'static>> {
 }
 
 /// Returns the [`clap::ArgGroup`]s for the `server` subcommand.
-fn all_arg_groups() -> Vec<clap::ArgGroup<'static>> {
+fn all_arg_groups() -> Vec<clap::ArgGroup> {
     vec![]
 }
 
 /// Returns the [`clap::Arg`] for `--port`.
-fn arg_port() -> clap::Arg<'static> {
+fn arg_port() -> clap::Arg {
     const SHORT: &str = "Port to serve on.";
     const LONG: &str = "\
 Sets the server listening port to PORT. Defaults to 8000.
@@ -56,7 +56,7 @@ Sets the server listening port to PORT. Defaults to 8000.
 }
 
 /// Returns the [`clap::Arg`] for `--worker-threads`.
-fn arg_worker_threads() -> clap::Arg<'static> {
+fn arg_worker_threads() -> clap::Arg {
     const SHORT: &str = "Number of worker threads to use.";
     const LONG: &str = "\
 Sets the number of worker threads to be used by the runtime to COUNT.
@@ -78,7 +78,7 @@ This argument defaults to the number of cores on the host machine.
 }
 
 /// Returns the [`clap::Arg`] for `--single-threaded`.
-fn arg_single_threaded() -> clap::Arg<'static> {
+fn arg_single_threaded() -> clap::Arg {
     const SHORT: &str = "Don't spawn threads.";
     const LONG: &str = "\
 Forces all operations to run on the main thread.
@@ -101,7 +101,7 @@ This argument is incompatible with --worker-threads and --signaller=blocking.
 }
 
 /// Returns the [`clap::Arg`] for `--log-level`.
-fn arg_log_level() -> clap::Arg<'static> {
+fn arg_log_level() -> clap::Arg {
     const SHORT: &str = "Minimum logging level.";
     const LONG: &str = "\
 Sets the minimum logging level. Log messages at or above the specified

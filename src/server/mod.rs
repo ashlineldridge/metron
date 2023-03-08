@@ -61,7 +61,7 @@ impl Service<Request<Body>> for Server {
         let result = Response::builder()
             .status(200)
             .header(hyper::header::CONTENT_TYPE, "utf-8")
-            .body(Body::from("This server sees you."));
+            .body(Body::from("This server sees you.\n"));
 
         let fut = future::ready(result);
         Box::pin(fut)

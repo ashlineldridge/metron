@@ -12,7 +12,7 @@ use crate::{cli::parser, profile::SignallerKind};
 ///   --duration 20s \
 ///   https://example.com
 /// ```
-pub fn command() -> clap::Command<'static> {
+pub fn command() -> clap::Command {
     const SHORT: &str = "Runs a performance profile test.";
     const LONG: &str = "\
 Runs a performance test against the specified target(s) and produces a report.
@@ -29,7 +29,7 @@ The report can be written to stdout and/or streamed to a metrics backend.
 }
 
 /// Returns all [`clap::Arg`]s for the `profile` subcommand.
-fn all_args() -> Vec<clap::Arg<'static>> {
+fn all_args() -> Vec<clap::Arg> {
     vec![
         arg_rate(),
         arg_duration(),
@@ -50,22 +50,22 @@ fn all_args() -> Vec<clap::Arg<'static>> {
 }
 
 /// Returns the [`clap::ArgGroup`]s for the `profile` subcommand.
-fn all_arg_groups() -> Vec<clap::ArgGroup<'static>> {
+fn all_arg_groups() -> Vec<clap::ArgGroup> {
     vec![arg_group_payload(), arg_group_thread_model()]
 }
 
 /// Returns the [`clap::ArgGroup`] for the arguments that decide the request payload.
-fn arg_group_payload() -> clap::ArgGroup<'static> {
+fn arg_group_payload() -> clap::ArgGroup {
     clap::ArgGroup::new("group-payload").multiple(false)
 }
 
 /// Returns the [`clap::ArgGroup`] for the arguments that decide the thread model.
-fn arg_group_thread_model() -> clap::ArgGroup<'static> {
+fn arg_group_thread_model() -> clap::ArgGroup {
     clap::ArgGroup::new("group-thread-model").multiple(false)
 }
 
 /// Returns the [`clap::Arg`] for `--rate`.
-fn arg_rate() -> clap::Arg<'static> {
+fn arg_rate() -> clap::Arg {
     const SHORT: &str = "Desired throughput rates.";
     const LONG: &str = "\
 Sets the desired throughput rate in terms of the number of requests per second
@@ -78,22 +78,18 @@ a variable rate, specify a range; e.g., --rate=100:200 --duration=15m implies
 that the request rate should increase linearly from 100 RPS to 200 RPS over a 15
 minute duration.
 
-To specify multiple test plan segments, where each segment can have its own rate
-and duration, specify multiple comma-separated values; e.g., --rate=100:500,500
---duration=5m,15m will create a 20 minute test plan containing two segments: the
-initial segment will ramp the rate up from 100 RPS to 500 RPS over the first
-5 minutes and then the rate will be held at a constant 500 RPS for the next 15
-minutes. When multiple values are specified, both --rate and --duration must
-receive the same number of values.
+To specify segments that each have their own rate and duration, specify multiple
+comma-separated values; e.g., --rate=100:500,500 --duration=5m,15m will create a
+20 minute test plan containing two segments: the initial segment will ramp the
+rate up from 100 RPS to 500 RPS over the first 5 minutes and then the rate will
+be held at a constant 500 RPS for the next 15 minutes. When multiple values are
+specified, both --rate and --duration must receive the same number of values.
 ";
 
     clap::Arg::new("rate")
         .long("rate")
         .value_name("RATE")
         .required(true)
-        .multiple_values(true)
-        .multiple_occurrences(true)
-        .require_value_delimiter(true)
         .value_delimiter(',')
         .value_parser(parser::rate)
         .help(SHORT)
@@ -101,7 +97,7 @@ receive the same number of values.
 }
 
 /// Returns the [`clap::Arg`] for `--duration`.
-fn arg_duration() -> clap::Arg<'static> {
+fn arg_duration() -> clap::Arg {
     const SHORT: &str = "Performance test durations.";
     const LONG: &str = "\
 Sets the durations of each test segment.
@@ -110,12 +106,12 @@ This argument can receive one or more values; the number of values specified
 must match the number of values passed to --rate. Each value defines the
 duration of the associated test segment.
 
-To specify multiple test plan segments, where each segment can have its own rate
-and duration, specify multiple comma-separated values; e.g., --rate=100:500,500
---duration=5m,15m will create a 20 minute test plan containing two segments: the
-initial segment will ramp the rate up from 100 RPS to 500 RPS over the first
-5 minutes and then the rate will be held at a constant 500 RPS for the next 15
-minutes.
+To specify segments that each have their own rate and duration, specify multiple
+comma-separated values; e.g., --rate=100:500,500 --duration=5m,15m will create a
+20 minute test plan containing two segments: the initial segment will ramp the
+rate up from 100 RPS to 500 RPS over the first 5 minutes and then the rate will
+be held at a constant 500 RPS for the next 15 minutes. When multiple values are
+specified, both --rate and --duration must receive the same number of values.
 
 A value of \"forever\" may be specified for fixed rate segments to indicate that
 the test should run forever or until CTRL-C is pressed. When specifying multiple
@@ -133,9 +129,6 @@ See https://docs.rs/humantime/latest/humantime for time format details.
         .long("duration")
         .value_name("DURATION")
         .required(true)
-        .multiple_values(true)
-        .multiple_occurrences(true)
-        .require_value_delimiter(true)
         .value_delimiter(',')
         .value_parser(parser::duration)
         .help(SHORT)
@@ -143,7 +136,7 @@ See https://docs.rs/humantime/latest/humantime for time format details.
 }
 
 /// Returns the [`clap::Arg`] for `--target`.
-fn arg_target() -> clap::Arg<'static> {
+fn arg_target() -> clap::Arg {
     const SHORT: &str = "Performance profile target(s).";
     const LONG: &str = "\
 Sets one or more target URLs for the performance profile. HTTP and HTTPS URLs
@@ -157,8 +150,6 @@ performance test will evenly distribute requests between the targets using round
         .long("target")
         .value_name("URL")
         .required(true)
-        .multiple_values(true)
-        .require_value_delimiter(true)
         .value_delimiter(',')
         .value_parser(parser::target)
         .help(SHORT)
@@ -166,7 +157,7 @@ performance test will evenly distribute requests between the targets using round
 }
 
 /// Returns the [`clap::Arg`] for `--http-method`.
-fn arg_http_method() -> clap::Arg<'static> {
+fn arg_http_method() -> clap::Arg {
     const SHORT: &str = "HTTP method.";
     const LONG: &str = "\
 Sets the HTTP method to use when making requests of the target.
@@ -186,7 +177,7 @@ and a payload is specified then HTTP POST will be assumed.
 }
 
 /// Returns the [`clap::Arg`] for `--payload`.
-fn arg_payload() -> clap::Arg<'static> {
+fn arg_payload() -> clap::Arg {
     const SHORT: &str = "HTTP payload.";
     const LONG: &str = "\
 Sets the HTTP payload string to use when making requests of the target.
@@ -206,7 +197,7 @@ then an empty payload will be used.
 }
 
 /// Returns the [`clap::Arg`] for `--payload-file`.
-fn arg_payload_file() -> clap::Arg<'static> {
+fn arg_payload_file() -> clap::Arg {
     const SHORT: &str = "HTTP payload file.";
     const LONG: &str = "\
 Sets the HTTP payload file to use when making requests of the target.
@@ -225,7 +216,7 @@ then an empty payload will be used.
 }
 
 /// Returns the [`clap::Arg`] for `--header`.
-fn arg_header() -> clap::Arg<'static> {
+fn arg_header() -> clap::Arg {
     const SHORT: &str = "HTTP header in K:V format.";
     const LONG: &str = "\
 Sets the specified header to be included in all requests. The value for this
@@ -238,17 +229,14 @@ This argument can be specified multiple times.
     clap::Arg::new("header")
         .long("header")
         .value_name("K:V")
-        .multiple_values(true)
-        .require_value_delimiter(true)
         .value_delimiter(',')
-        .multiple_occurrences(true)
         .value_parser(parser::header)
         .help(SHORT)
         .long_help(LONG)
 }
 
 /// Returns the [`clap::Arg`] for `--worker-threads`.
-fn arg_worker_threads() -> clap::Arg<'static> {
+fn arg_worker_threads() -> clap::Arg {
     const SHORT: &str = "Number of worker threads to use.";
     const LONG: &str = "\
 Sets the number of worker threads to be used by the runtime to COUNT.
@@ -270,7 +258,7 @@ This argument defaults to the number of cores on the host machine.
 }
 
 /// Returns the [`clap::Arg`] for `--single-threaded`.
-fn arg_single_threaded() -> clap::Arg<'static> {
+fn arg_single_threaded() -> clap::Arg {
     const SHORT: &str = "Don't spawn threads.";
     const LONG: &str = "\
 Forces all operations to run on the main thread.
@@ -293,7 +281,7 @@ This argument is incompatible with --worker-threads and --signaller=blocking.
 }
 
 /// Returns the [`clap::Arg`] for `--connections`.
-fn arg_connections() -> clap::Arg<'static> {
+fn arg_connections() -> clap::Arg {
     const SHORT: &str = "Number of TCP connections to use.";
     const LONG: &str = "\
 Sets the number of TCP connections that should be used.
@@ -311,7 +299,7 @@ TODO: Elaborate.
 }
 
 /// Returns the [`clap::Arg`] for `--signaller`.
-fn arg_signaller() -> clap::Arg<'static> {
+fn arg_signaller() -> clap::Arg {
     const SHORT: &str = "Method for generating timing signals.";
     const LONG: &str = "\
 Selects the type of signalling system that should be used to generate request
@@ -329,7 +317,7 @@ generally be what you want.
 }
 
 /// Returns the [`clap::Arg`] for `--no-latency-correction`.
-fn arg_no_latency_correction() -> clap::Arg<'static> {
+fn arg_no_latency_correction() -> clap::Arg {
     const SHORT: &str = "Disables latency correction.";
     const LONG: &str = "\
 Disables latency correction that accounts for coordinated omission.
@@ -348,7 +336,7 @@ known as \"Coordinated Omission\". Latency correction is enabled by defeault.
 }
 
 /// Returns the [`clap::Arg`] for `--stop-on-client-error`.
-fn arg_stop_on_client_error() -> clap::Arg<'static> {
+fn arg_stop_on_client_error() -> clap::Arg {
     const SHORT: &str = "Whether to stop if on error.";
     const LONG: &str = "\
 Sets whether the profiling operation should stop if the client encounters an
@@ -367,7 +355,7 @@ See --stop-on-http-non-2xx for setting HTTP status stopping behaviour.
 }
 
 /// Returns the [`clap::Arg`] for `--stop-on-non-2xx`.
-fn arg_stop_on_non_2xx() -> clap::Arg<'static> {
+fn arg_stop_on_non_2xx() -> clap::Arg {
     const SHORT: &str = "Whether to stop on non-2XX HTTP status.";
     const LONG: &str = "\
 Sets whether the profiling operation should stop if a non-2XX HTTP status is
@@ -386,7 +374,7 @@ See --stop-on-client-error for setting error stopping behaviour.
 // TODO: Reorganize args at both global level (e.g. this should prob be one) and across
 // this file and server.rs as there's a bit of repetition.
 /// Returns the [`clap::Arg`] for `--log-level`.
-fn arg_log_level() -> clap::Arg<'static> {
+fn arg_log_level() -> clap::Arg {
     const SHORT: &str = "Minimum logging level.";
     const LONG: &str = "\
 Sets the minimum logging level. Log messages at or above the specified

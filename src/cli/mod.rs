@@ -64,7 +64,7 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
     if rates.len() != durations.len() {
         return Err(profile::command()
             .error(
-                clap::ErrorKind::WrongNumberOfValues,
+                clap::error::ErrorKind::WrongNumberOfValues,
                 "The number of --rate and --duration arguments must match",
             )
             .into());
@@ -76,7 +76,7 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
         if duration.is_none() && it.peek().is_some() {
             return Err(profile::command()
                 .error(
-                    clap::ErrorKind::ValueValidation,
+                    clap::error::ErrorKind::ValueValidation,
                     "Only the last --duration value can be \"forever\"",
                 )
                 .into());
@@ -94,7 +94,7 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
                 } else {
                     return Err(profile::command()
                             .error(
-                                clap::ErrorKind::ValueValidation,
+                                clap::error::ErrorKind::ValueValidation,
                                 "Only fixed-rate segments may have a --duration value can be \"forever\"",
                             )
                             .into());
@@ -142,7 +142,7 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
     if config.runtime.is_single_threaded() && config.signaller_kind.is_blocking() {
         return Err(profile::command()
             .error(
-                clap::ErrorKind::ArgumentConflict,
+                clap::error::ErrorKind::ArgumentConflict,
                 "Use of a single-threaded runtime is not compatible with a blocking signaller",
             )
             .into());
