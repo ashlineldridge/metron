@@ -55,7 +55,7 @@ pub struct Builder {
     error_histograms: HashMap<Url, Histogram>,
 
     /// Request delay histograms keyed by target URL. These histograms track the delay period
-    /// between when a request should have been sent and when it was sent (i.e., when the delay
+    /// between when a request should have been sent and when it was sent (i.e. when the delay
     /// increases it means that we cannot keep up with the desired request rate).
     delay_histograms: HashMap<Url, Histogram>,
 }

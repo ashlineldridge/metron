@@ -72,14 +72,14 @@ Sets the desired throughput rate in terms of the number of requests per second
 (RPS) that should be generated for each segment of the test.
 
 This argument can receive multiple values and may be used to specify both fixed
-and variable rates. To specify a fixed rate, specify an integer value; e.g.,
+and variable rates. To specify a fixed rate, specify an integer value; e.g.
 --rate=100 --duration=15m implies a fixed rate of 100 RPS for 15 minutes. To use
-a variable rate, specify a range; e.g., --rate=100:200 --duration=15m implies
+a variable rate, specify a range; e.g. --rate=100:200 --duration=15m implies
 that the request rate should increase linearly from 100 RPS to 200 RPS over a 15
 minute duration.
 
 To specify segments that each have their own rate and duration, specify multiple
-comma-separated values; e.g., --rate=100:500,500 --duration=5m,15m will create a
+comma-separated values; e.g. --rate=100:500,500 --duration=5m,15m will create a
 20 minute test plan containing two segments: the initial segment will ramp the
 rate up from 100 RPS to 500 RPS over the first 5 minutes and then the rate will
 be held at a constant 500 RPS for the next 15 minutes. When multiple values are
@@ -90,6 +90,8 @@ specified, both --rate and --duration must receive the same number of values.
         .long("rate")
         .value_name("RATE")
         .required(true)
+        .action(ArgAction::Append)
+        .num_args(1..)
         .value_delimiter(',')
         .value_parser(parser::rate)
         .help(SHORT)
@@ -107,7 +109,7 @@ must match the number of values passed to --rate. Each value defines the
 duration of the associated test segment.
 
 To specify segments that each have their own rate and duration, specify multiple
-comma-separated values; e.g., --rate=100:500,500 --duration=5m,15m will create a
+comma-separated values; e.g. --rate=100:500,500 --duration=5m,15m will create a
 20 minute test plan containing two segments: the initial segment will ramp the
 rate up from 100 RPS to 500 RPS over the first 5 minutes and then the rate will
 be held at a constant 500 RPS for the next 15 minutes. When multiple values are
@@ -115,7 +117,7 @@ specified, both --rate and --duration must receive the same number of values.
 
 A value of \"forever\" may be specified for fixed rate segments to indicate that
 the test should run forever or until CTRL-C is pressed. When specifying multiple
-test segments, \"forever\" can only be specified for the last segment. E.g.,
+test segments, \"forever\" can only be specified for the last segment. E.g.
 --rate=100,200 --duration=5m,forever will will create an infinite test plan
 containing two segments: the first segment will rate 100 RPS for 5 minutes and
 then the second segment will rate 200 RPS until it is interrupted. Variable rate
@@ -129,6 +131,8 @@ See https://docs.rs/humantime/latest/humantime for time format details.
         .long("duration")
         .value_name("DURATION")
         .required(true)
+        .action(ArgAction::Append)
+        .num_args(1..)
         .value_delimiter(',')
         .value_parser(parser::duration)
         .help(SHORT)
@@ -150,6 +154,8 @@ performance test will evenly distribute requests between the targets using round
         .long("target")
         .value_name("URL")
         .required(true)
+        .action(ArgAction::Append)
+        .num_args(1..)
         .value_delimiter(',')
         .value_parser(parser::target)
         .help(SHORT)
@@ -341,7 +347,7 @@ fn arg_stop_on_client_error() -> clap::Arg {
     const LONG: &str = "\
 Sets whether the profiling operation should stop if the client encounters an
 error when sending requests to the target(s). This setting only affects *client-
-side* errors (e.g., too many open files) and not HTTP error statuses returned by
+side* errors (e.g. too many open files) and not HTTP error statuses returned by
 the target(s).
 
 See --stop-on-http-non-2xx for setting HTTP status stopping behaviour.

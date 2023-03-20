@@ -6,24 +6,29 @@ version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.69"
-clap = { version = "4.1.8", features = ["cargo", "derive"] }
+anyhow = "1.0.70"
+clap = { version = "4.1.11", features = ["cargo", "derive"] }
 either = "1.8.1"
 env_logger = "0.10.0"
 hdrhistogram = "7.5.2"
 humantime = "2.1.0"
 humantime-serde = "1.1.1"
-hyper = { version = "0.14.24", features = ["full"] }
+hyper = { version = "0.14.25", features = ["full"] }
 hyper-tls = "0.5.0"
 lazy_static = "1.4.0"
 log = "0.4.17"
 metrics = "0.20.1"
 metrics-exporter-prometheus = "0.11.0"
 num_cpus = "1.15.0"
-serde = { version = "1.0.153", features = ["derive"] }
+serde = { version = "1.0.157", features = ["derive"] }
 serde_yaml = "0.9.19"
-thiserror = "1.0.39"
+thiserror = "1.0.40"
 tokio = { version = "1.26.0", features = ["full"] }
 tower = { version = "0.4.13", features = ["full"] }
 tower-http = "0.4.0"
 url = { version = "2.3.1", features = ["serde"] }
+
+[dev-dependencies]
+assert_cmd = "2.0.10"
+mockito = "1.0.0"
+predicates = "3.0.1"

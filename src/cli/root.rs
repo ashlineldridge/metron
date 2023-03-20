@@ -44,7 +44,7 @@ fn arg_config_file() -> clap::Arg {
     const LONG: &str = "\
 All commands allow a configuration file to be used as an alternative to
 individual command line arguments. Stdin can also be used by specifying
-a hyphen as the file name (i.e., `--config-file -`).
+a hyphen as the file name (i.e. `--config-file -`).
 
 When both a configuration file and individual command line arguments are used,
 the arguments will override their counterpart properties in the configuration

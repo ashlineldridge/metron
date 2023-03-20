@@ -208,10 +208,7 @@ where
 
 #[cfg(test)]
 mod profile_tests {
-    use clap::{
-        error::{ContextKind, ContextValue},
-        ErrorKind,
-    };
+    use clap::error::{ContextKind, ContextValue};
 
     use super::*;
 
@@ -239,7 +236,7 @@ mod profile_tests {
         if let Error::InvalidCli(inner) = err {
             let (ctx_kind, ctx_value) = inner.context().next().unwrap();
 
-            assert_eq!(inner.kind, ErrorKind::MissingRequiredArgument);
+            assert_eq!(inner.kind(), clap::error::ErrorKind::MissingRequiredArgument);
             assert_eq!(ctx_kind, ContextKind::InvalidArg);
             assert_eq!(
                 ctx_value,

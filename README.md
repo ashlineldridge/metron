@@ -5,6 +5,18 @@ and both fixed and linearly changing rates are supported. Metron has been my per
 project for exploring Rust concurrency and attempting to provide an implementation for
 addressing [coordinated omission](https://www.youtube.com/watch?v=lJ8ydIuPFeU).
 
+Metron aims to provide a general-purpose engine that executes jobs at a specified rate
+and streams telemetry data in real-time. The rate at which Metron executes jobs can be
+submitted as a declarative plan or set in real-time (e.g. via gRPC) when the Metron
+profiler is running in server mode. Metron will support running both as a self-contained
+CLI application and in a distributed mode where an arbitrary number of data plane Metron
+instances are coordinated by a control plane and the data plane instances stream their
+telemetry to a central observability backend. In addition to be able to specify the rate
+at which Metron operates, Metron will also have a mode that accepts a target latency
+value; it will then adjust the rate until it finds the maximum rate at which the target
+latency can be achieved. This provides a straightfoward way of solving problems such as,
+"My latency SLO is 50ms at 99.9%, what is the maximum throughtput I can support?"
+
 ## Profile CLI
 
 ```
@@ -24,14 +36,14 @@ OPTIONS:
             (RPS) that should be generated for each segment of the test.
 
             This argument can receive multiple values and may be used to specify both fixed
-            and variable rates. To specify a fixed rate, specify an integer value; e.g.,
+            and variable rates. To specify a fixed rate, specify an integer value; e.g.
             --rate=100 --duration=15m implies a fixed rate of 100 RPS for 15 minutes. To use
-            a variable rate, specify a range; e.g., --rate=100:200 --duration=15m implies
+            a variable rate, specify a range; e.g. --rate=100:200 --duration=15m implies
             that the request rate should increase linearly from 100 RPS to 200 RPS over a 15
             minute duration.
 
             To specify multiple test plan segments, where each segment can have its own rate
-            and duration, specify multiple comma-separated values; e.g., --rate=100:500,500
+            and duration, specify multiple comma-separated values; e.g. --rate=100:500,500
             --duration=5m,15m will create a 20 minute test plan containing two segments: the
             initial segment will ramp the rate up from 100 RPS to 500 RPS over the first
             5 minutes and then the rate will be held at a constant 500 RPS for the next 15
@@ -46,7 +58,7 @@ OPTIONS:
             duration of the associated test segment.
 
             To specify multiple test plan segments, where each segment can have its own rate
-            and duration, specify multiple comma-separated values; e.g., --rate=100:500,500
+            and duration, specify multiple comma-separated values; e.g. --rate=100:500,500
             --duration=5m,15m will create a 20 minute test plan containing two segments: the
             initial segment will ramp the rate up from 100 RPS to 500 RPS over the first
             5 minutes and then the rate will be held at a constant 500 RPS for the next 15
@@ -54,7 +66,7 @@ OPTIONS:
 
             A value of "forever" may be specified for fixed rate segments to indicate that
             the test should run forever or until CTRL-C is pressed. When specifying multiple
-            test segments, "forever" can only be specified for the last segment. E.g.,
+            test segments, "forever" can only be specified for the last segment. E.g.
             --rate=100,200 --duration=5m,forever will will create an infinite test plan
             containing two segments: the first segment will rate 100 RPS for 5 minutes and
             then the second segment will rate 200 RPS until it is interrupted. Variable rate
@@ -150,7 +162,7 @@ OPTIONS:
         --stop-on-client-error
             Sets whether the profiling operation should stop if the client encounters an
             error when sending requests to the target(s). This setting only affects *client-
-            side* errors (e.g., too many open files) and not HTTP error statuses returned by
+            side* errors (e.g. too many open files) and not HTTP error statuses returned by
             the target(s).
 
             See --stop-on-http-non-2xx for setting HTTP status stopping behaviour.
@@ -172,7 +184,7 @@ OPTIONS:
         --config-file <FILE>
             All commands allow a configuration file to be used as an alternative to
             individual command line arguments. Stdin can also be used by specifying
-            a hyphen as the file name (i.e., `--config-file -`).
+            a hyphen as the file name (i.e. `--config-file -`).
 
             When both a configuration file and individual command line arguments are used,
             the arguments will override their counterpart properties in the configuration
@@ -230,7 +242,7 @@ OPTIONS:
         --config-file <FILE>
             All commands allow a configuration file to be used as an alternative to
             individual command line arguments. Stdin can also be used by specifying
-            a hyphen as the file name (i.e., `--config-file -`).
+            a hyphen as the file name (i.e. `--config-file -`).
 
             When both a configuration file and individual command line arguments are used,
             the arguments will override their counterpart properties in the configuration

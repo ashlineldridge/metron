@@ -14,6 +14,7 @@ use config::Config;
 
 use crate::profile::Profiler;
 
+/// Application entry point.
 fn main() -> Result<()> {
     let config = match cli::parse(env::args_os()) {
         Err(cli::Error::InvalidCli(err)) => err.exit(),
