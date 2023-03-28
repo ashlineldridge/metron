@@ -34,12 +34,12 @@ fn all_subcommands() -> Vec<clap::Command> {
     .collect()
 }
 
-/// Returns all [`clap::Arg`]s for the root command.
+/// Returns the [`clap::Arg`]s common to all subcommands.
 fn common_args() -> Vec<clap::Arg> {
     vec![arg_config_file(), arg_print_config()]
 }
 
-/// Returns the [`clap::ArgGroup`]s for the root command.
+/// Returns the [`clap::ArgGroup`]s common to all for the root command.
 fn common_arg_groups() -> Vec<clap::ArgGroup> {
     vec![]
 }
