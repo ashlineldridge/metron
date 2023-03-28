@@ -1,7 +1,10 @@
+mod control;
+mod echo;
+mod node;
+mod operator;
 mod parser;
 mod profile;
 mod root;
-mod server;
 
 use std::{
     ffi::OsString,
@@ -41,10 +44,60 @@ where
     // `panic!` as if we were to encounter these it'd mean we've misconfigured clap.
     let subcommand = matches.subcommand().unwrap();
     let config = match subcommand {
+        ("operator", matches) => config::Config::Operator(parse_operator_config(matches)?),
+        ("echo", matches) => config::Config::Echo(parse_echo_config(matches)?),
+        ("node", matches) => config::Config::Node(parse_node_config(matches)?),
         ("profile", matches) => config::Config::Profile(parse_profile_config(matches)?),
-        ("server", matches) => config::Config::Server(parse_server_config(matches)?),
+        ("control", matches) => config::Config::Control(parse_control_config(matches)?),
         _ => panic!("Unknown subcommand"),
     };
+
+    Ok(config)
+}
+
+fn parse_operator_config(matches: &clap::ArgMatches) -> Result<crate::operator::Config, Error> {
+    // Deserialize the config file if one was specified. Additional command line
+    // options are then applied on top.
+    let mut config = if let Some(config) = parse_config_file(matches)? {
+        config
+    } else {
+        crate::operator::Config::default()
+    };
+
+    config.runtime = parse_runtime_config(matches)?;
+    config.log_level = *matches.get_one("log-level").unwrap();
+
+    Ok(config)
+}
+
+fn parse_echo_config(matches: &clap::ArgMatches) -> Result<crate::echo::Config, Error> {
+    // Deserialize the config file if one was specified. Additional command line
+    // options are then applied on top.
+    let mut config = if let Some(config) = parse_config_file(matches)? {
+        config
+    } else {
+        crate::echo::Config::default()
+    };
+
+    config.runtime = parse_runtime_config(matches)?;
+
+    config.port = *matches.get_one("port").unwrap();
+    config.log_level = *matches.get_one("log-level").unwrap();
+
+    Ok(config)
+}
+
+fn parse_node_config(matches: &clap::ArgMatches) -> Result<crate::node::Config, Error> {
+    // Deserialize the config file if one was specified. Additional command line
+    // options are then applied on top.
+    let mut config = if let Some(config) = parse_config_file(matches)? {
+        config
+    } else {
+        crate::node::Config::default()
+    };
+
+    config.runtime = parse_runtime_config(matches)?;
+    config.log_level = *matches.get_one("log-level").unwrap();
 
     Ok(config)
 }
@@ -151,18 +204,15 @@ fn parse_profile_config(matches: &clap::ArgMatches) -> Result<crate::profile::Co
     Ok(config)
 }
 
-fn parse_server_config(matches: &clap::ArgMatches) -> Result<crate::server::Config, Error> {
+fn parse_control_config(matches: &clap::ArgMatches) -> Result<crate::control::Config, Error> {
     // Deserialize the config file if one was specified. Additional command line
     // options are then applied on top.
     let mut config = if let Some(config) = parse_config_file(matches)? {
         config
     } else {
-        crate::server::Config::default()
+        crate::control::Config::default()
     };
 
-    config.runtime = parse_runtime_config(matches)?;
-
-    config.port = *matches.get_one("port").unwrap();
     config.log_level = *matches.get_one("log-level").unwrap();
 
     Ok(config)
@@ -236,7 +286,10 @@ mod profile_tests {
         if let Error::InvalidCli(inner) = err {
             let (ctx_kind, ctx_value) = inner.context().next().unwrap();
 
-            assert_eq!(inner.kind(), clap::error::ErrorKind::MissingRequiredArgument);
+            assert_eq!(
+                inner.kind(),
+                clap::error::ErrorKind::MissingRequiredArgument
+            );
             assert_eq!(ctx_kind, ContextKind::InvalidArg);
             assert_eq!(
                 ctx_value,
@@ -298,14 +351,17 @@ mod profile_tests {
             "--target=https://example.com",
         ];
 
-        // TODO: Assert that the error is as expected.
         let err = parse(args).unwrap_err();
-        dbg!(&err);
+        if let Error::InvalidCli(inner) = err {
+            assert_eq!(inner.kind(), clap::error::ErrorKind::WrongNumberOfValues);
+        } else {
+            panic!("Expected Error::InvalidCli error but got: {:?}", err);
+        }
     }
 
     #[test]
     fn invalid_rate_value() {
-        // Specify a multi-segment test plan with a mismatching number of rates and durations.
+        // Specify an invalid rate value.
         let args = [
             "metron",
             "profile",
@@ -314,8 +370,18 @@ mod profile_tests {
             "--target=https://example.com",
         ];
 
-        // TODO: Assert that the error is as expected.
         let err = parse(args).unwrap_err();
-        dbg!(&err);
+        if let Error::InvalidCli(inner) = err {
+            let (ctx_kind, ctx_value) = inner.context().next().unwrap();
+
+            assert_eq!(inner.kind(), clap::error::ErrorKind::ValueValidation);
+            assert_eq!(ctx_kind, ContextKind::InvalidArg);
+            assert_eq!(
+                ctx_value,
+                &ContextValue::String("--rate <RATE>...".to_owned())
+            );
+        } else {
+            panic!("Expected Error::InvalidCli error but got: {:?}", err);
+        }
     }
 }

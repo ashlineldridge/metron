@@ -2,9 +2,12 @@
 
 mod cli;
 mod config;
+mod echo;
+mod node;
+mod operator;
 mod profile;
+mod control;
 mod runtime;
-mod server;
 mod wait;
 
 use std::env;
@@ -18,7 +21,7 @@ use crate::profile::Profiler;
 fn main() -> Result<()> {
     let config = match cli::parse(env::args_os()) {
         Err(cli::Error::InvalidCli(err)) => err.exit(),
-        x => x,
+        v => v,
     }?;
 
     env_logger::builder()
@@ -30,8 +33,11 @@ fn main() -> Result<()> {
 
     let handle = tokio::spawn(async move {
         match config {
-            Config::Profile(config) => run_profile(&config).await,
-            Config::Server(config) => run_server(&config).await,
+            Config::Operator(config) => run_operator(&config).await,
+            Config::Echo(config) => run_echo_server(&config).await,
+            Config::Node(config) => run_node(&config).await,
+            Config::Profile(config) => run_profile_test(&config).await,
+            Config::Control(config) => run_control_command(&config).await,
         }
     });
 
@@ -40,7 +46,21 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-async fn run_profile(config: &profile::Config) -> Result<()> {
+async fn run_operator(_config: &operator::Config) -> Result<()> {
+    println!("Running Metron operator");
+    Ok(())
+}
+
+async fn run_echo_server(config: &echo::Config) -> Result<()> {
+    echo::serve(config).await
+}
+
+async fn run_node(_config: &node::Config) -> Result<()> {
+    println!("Running Metron node");
+    Ok(())
+}
+
+async fn run_profile_test(config: &profile::Config) -> Result<()> {
     let profiler = Profiler::new(config.clone());
     let report = profiler.run().await;
     match report {
@@ -57,8 +77,9 @@ async fn run_profile(config: &profile::Config) -> Result<()> {
         .context("Profiling operation was aborted due to error")
 }
 
-async fn run_server(config: &server::Config) -> Result<()> {
-    server::serve(config).await
+async fn run_control_command(_config: &control::Config) -> Result<()> {
+    println!("Running Metron control command");
+    Ok(())
 }
 
 fn print_report(report: &profile::Report) -> Result<()> {

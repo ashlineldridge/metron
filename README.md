@@ -202,7 +202,7 @@ OPTIONS:
             Print help information
 ```
 
-## Server CLI
+## Echo Server CLI
 
 The server is basically featureless at the moment.
 

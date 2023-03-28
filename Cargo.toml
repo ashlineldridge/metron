@@ -25,7 +25,6 @@ serde_yaml = "0.9.19"
 thiserror = "1.0.40"
 tokio = { version = "1.26.0", features = ["full"] }
 tower = { version = "0.4.13", features = ["full"] }
-tower-http = "0.4.0"
 url = { version = "2.3.1", features = ["serde"] }
 
 [dev-dependencies]

@@ -1,4 +1,4 @@
-use crate::cli::{profile, server};
+use crate::cli::{operator, echo, node, profile, control};
 
 const ABOUT: &str = "
 Metron is a modern L7 performance profiler.
@@ -22,10 +22,16 @@ pub fn command() -> clap::Command {
 }
 
 fn all_subcommands() -> Vec<clap::Command> {
-    vec![profile::command(), server::command()]
-        .into_iter()
-        .map(|c| c.args(common_args()).groups(common_arg_groups()))
-        .collect()
+    vec![
+        operator::command(),
+        echo::command(),
+        node::command(),
+        profile::command(),
+        control::command(),
+    ]
+    .into_iter()
+    .map(|c| c.args(common_args()).groups(common_arg_groups()))
+    .collect()
 }
 
 /// Returns all [`clap::Arg`]s for the root command.

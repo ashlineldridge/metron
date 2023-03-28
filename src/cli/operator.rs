@@ -1,22 +1,21 @@
 use clap::{value_parser, ArgAction};
 use metron::LogLevel;
 
-/// Creates the [`clap::Command`] for the `server` subcommand.
+/// Creates the [`clap::Command`] for the `operator` subcommand.
 ///
 /// # Examples
 /// ```bash
-/// metron server --port 8080
+/// metron operator --blah --blah
 /// ```
 pub(crate) fn command() -> clap::Command {
-    const SHORT: &str = "Runs an echo server.";
+    const SHORT: &str = "Runs a Metron operator instance.";
     const LONG: &str = "\
-Runs an echo server that may be used within performance profile tests.
+TBD
 
-This command starts a echo server that may be configured in terms of its
-responses, latency, and other properties.
+Hmmm...
 ";
 
-    clap::Command::new("server")
+    clap::Command::new("operator")
         .about(SHORT)
         .long_about(LONG)
         .args(all_args())
@@ -28,7 +27,6 @@ responses, latency, and other properties.
 fn all_args() -> Vec<clap::Arg> {
     vec![
         arg_log_level(),
-        arg_port(),
         arg_worker_threads(),
         arg_single_threaded(),
     ]
@@ -37,22 +35,6 @@ fn all_args() -> Vec<clap::Arg> {
 /// Returns the [`clap::ArgGroup`]s for the `server` subcommand.
 fn all_arg_groups() -> Vec<clap::ArgGroup> {
     vec![]
-}
-
-/// Returns the [`clap::Arg`] for `--port`.
-fn arg_port() -> clap::Arg {
-    const SHORT: &str = "Port to serve on.";
-    const LONG: &str = "\
-Sets the server listening port to PORT. Defaults to 8000.
-";
-
-    clap::Arg::new("port")
-        .long("port")
-        .value_name("PORT")
-        .default_value("8000")
-        .value_parser(value_parser!(u16))
-        .help(SHORT)
-        .long_help(LONG)
 }
 
 /// Returns the [`clap::Arg`] for `--worker-threads`.

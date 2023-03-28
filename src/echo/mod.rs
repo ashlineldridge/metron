@@ -14,7 +14,7 @@ use log::info;
 use tower::{make::Shared, Service, ServiceBuilder};
 
 pub use self::config::Config;
-use crate::server::prom::PromHttpServerLayer;
+use crate::echo::prom::PromHttpServerLayer;
 
 pub async fn serve(config: &Config) -> Result<()> {
     let server = Server::new(config.clone());
