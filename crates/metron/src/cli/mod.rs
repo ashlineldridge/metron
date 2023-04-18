@@ -1,7 +1,6 @@
 mod control;
 mod echo;
 mod node;
-mod operator;
 mod parser;
 mod profile;
 mod root;
@@ -44,28 +43,12 @@ where
     // `panic!` as if we were to encounter these it'd mean we've misconfigured clap.
     let subcommand = matches.subcommand().unwrap();
     let config = match subcommand {
-        ("operator", matches) => config::Config::Operator(parse_operator_config(matches)?),
         ("echo", matches) => config::Config::Echo(parse_echo_config(matches)?),
         ("node", matches) => config::Config::Node(parse_node_config(matches)?),
         ("profile", matches) => config::Config::Profile(parse_profile_config(matches)?),
         ("control", matches) => config::Config::Control(parse_control_config(matches)?),
         _ => panic!("Unknown subcommand"),
     };
-
-    Ok(config)
-}
-
-fn parse_operator_config(matches: &clap::ArgMatches) -> Result<crate::operator::Config, Error> {
-    // Deserialize the config file if one was specified. Additional command line
-    // options are then applied on top.
-    let mut config = if let Some(config) = parse_config_file(matches)? {
-        config
-    } else {
-        crate::operator::Config::default()
-    };
-
-    config.runtime = parse_runtime_config(matches)?;
-    config.log_level = *matches.get_one("log-level").unwrap();
 
     Ok(config)
 }

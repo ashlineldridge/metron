@@ -2,11 +2,11 @@
 
 mod cli;
 mod config;
-mod echo;
-mod node;
-mod operator;
-mod profile;
 mod control;
+mod echo;
+mod newcli;
+mod node;
+mod profile;
 mod runtime;
 mod wait;
 
@@ -33,7 +33,6 @@ fn main() -> Result<()> {
 
     let handle = tokio::spawn(async move {
         match config {
-            Config::Operator(config) => run_operator(&config).await,
             Config::Echo(config) => run_echo_server(&config).await,
             Config::Node(config) => run_node(&config).await,
             Config::Profile(config) => run_profile_test(&config).await,
@@ -43,11 +42,6 @@ fn main() -> Result<()> {
 
     runtime.block_on(handle)??;
 
-    Ok(())
-}
-
-async fn run_operator(_config: &operator::Config) -> Result<()> {
-    println!("Running Metron operator");
     Ok(())
 }
 
