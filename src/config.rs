@@ -22,6 +22,7 @@ impl Config {
         }
     }
 
+    // TODO: This feels very unidiomatic. Fix.
     pub fn runtime(&self) -> &runtime::Config {
         match self {
             Config::Operator(c) => &c.runtime,

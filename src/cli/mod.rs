@@ -81,7 +81,7 @@ fn parse_echo_config(matches: &clap::ArgMatches) -> Result<crate::echo::Config, 
 
     config.runtime = parse_runtime_config(matches)?;
 
-    config.port = *matches.get_one("port").unwrap();
+    // config.port = *matches.get_one("port").unwrap();
     config.log_level = *matches.get_one("log-level").unwrap();
 
     Ok(config)

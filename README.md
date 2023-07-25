@@ -1,6 +1,6 @@
 # Metron
 
-Metron is an L7 performance profiling tool. The request rate can be controlled precisely
+Metron is a load testing toolchain. The request rate can be controlled precisely
 and both fixed and linearly changing rates are supported. Metron has been my personal
 project for exploring Rust concurrency and attempting to provide an implementation for
 addressing [coordinated omission](https://www.youtube.com/watch?v=lJ8ydIuPFeU).

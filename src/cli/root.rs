@@ -1,7 +1,7 @@
-use crate::cli::{operator, echo, node, profile, control};
+use crate::cli::{control, echo, node, operator, profile};
 
 const ABOUT: &str = "
-Metron is a modern L7 performance profiler.
+Metron is a modern load testing toolchain.
 
 Use --help for more details.
 
