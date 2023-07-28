@@ -24,8 +24,8 @@ metrics-exporter-prometheus = "0.12.1"
 num_cpus = "1.16.0"
 opentelemetry = "0.19.0"
 opentelemetry-jaeger = "0.18.0"
-serde = { version = "1.0.175", features = ["derive"] }
-serde_json = "1.0.103"
+serde = { version = "1.0.177", features = ["derive"] }
+serde_json = "1.0.104"
 serde_yaml = "0.9.25"
 thiserror = "1.0.44"
 tokio = { version = "1.29.1", features = ["full"] }
