@@ -2,11 +2,11 @@
 
 mod cli;
 mod config;
+mod control;
 mod echo;
 mod node;
 mod operator;
 mod profile;
-mod control;
 mod runtime;
 mod wait;
 
@@ -19,6 +19,9 @@ use crate::profile::Profiler;
 
 /// Application entry point.
 fn main() -> Result<()> {
+    // TODO: This feels very OO. It's all just to facilitate knowing what the
+    // runtime settings are so that the Tokio runtime can be built here, in
+    // main, rather the further down the call tree.
     let config = match cli::parse(env::args_os()) {
         Err(cli::Error::InvalidCli(err)) => err.exit(),
         v => v,

@@ -1,0 +1,40 @@
+[package]
+name = "metron"
+authors = ["Ashlin Eldridge"]
+description = "Performance characterization tool"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.72"
+axum = { version = "0.6.20" }
+clap = { version = "4.3.21", features = ["cargo", "derive"] }
+console-subscriber = "0.1.10"
+either = "1.9.0"
+env_logger = "0.10.0"
+hdrhistogram = "7.5.2"
+humantime = "2.1.0"
+humantime-serde = "1.1.1"
+hyper = { version = "0.14.27", features = ["full"] }
+hyper-tls = "0.5.0"
+lazy_static = "1.4.0"
+log = "0.4.20"
+metrics = "0.21.1"
+metrics-exporter-prometheus = "0.12.1"
+num_cpus = "1.16.0"
+opentelemetry = "0.20.0"
+opentelemetry-jaeger = "0.19.0"
+serde = { version = "1.0.183", features = ["derive"] }
+serde_json = "1.0.104"
+serde_yaml = "0.9.25"
+thiserror = "1.0.44"
+tokio = { version = "1.31.0", features = ["full"] }
+tower = { version = "0.4.13", features = ["full"] }
+tower-http = { version = "0.4.3", features = ["trace"] }
+tracing = "0.1.37"
+tracing-opentelemetry = "0.20.0"
+tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
+url = { version = "2.4.0", features = ["serde"] }
+
+[dev-dependencies]
+assert_cmd = "2.0.12"

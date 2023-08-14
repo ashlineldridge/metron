@@ -1,4 +1,32 @@
-# Metron
+* Metron
+
+** TODOs
+
+Let the Cargo workspace structure be guided by the concept of a toolchain - each
+member crate provides a different specific tool. Potentially there is just a single
+=clis= binary crate; all other crates are library crates and the =clis= crate
+produces multiple binaries (e.g. single-purpose ones and multi-purpose such as both
+echo server and client).
+
+E.g. the =driver= crate could provide an interface like:
+#+begin_src rust
+  pub struct Driver {}
+  pub struct Config {}
+  pub struct Handle {}
+
+  impl Driver {
+      pub fn new(config: Config) -> Self {}
+      pub async fn run() -> Handle {}
+
+  }
+
+  impl Handle {
+      pub async fn enqueue(plan: Plan) -> Result<()> {}
+      pub async fn halt() -> Result<()> {}
+  }
+#+end_src
+
+** Previous
 
 Metron is a load testing toolchain. The request rate can be controlled precisely
 and both fixed and linearly changing rates are supported. Metron has been my personal
@@ -17,9 +45,8 @@ value; it will then adjust the rate until it finds the maximum rate at which the
 latency can be achieved. This provides a straightfoward way of solving problems such as,
 "My latency SLO is 50ms at 99.9%, what is the maximum throughtput I can support?"
 
-## Profile CLI
-
-```
+** Profile CLI
+#+begin_example
 > metron profile --help
 
 metron-profile
@@ -184,7 +211,7 @@ OPTIONS:
         --config-file <FILE>
             All commands allow a configuration file to be used as an alternative to
             individual command line arguments. Stdin can also be used by specifying
-            a hyphen as the file name (i.e. `--config-file -`).
+            a hyphen as the file name (i.e. =--config-file -=).
 
             When both a configuration file and individual command line arguments are used,
             the arguments will override their counterpart properties in the configuration
@@ -200,13 +227,10 @@ OPTIONS:
 
     -h, --help
             Print help information
-```
+#+end_example
 
-## Echo Server CLI
-
-The server is basically featureless at the moment.
-
-```
+** Echo Server CLI
+#+begin_example
 > metron server --help
 
 metron-server
@@ -258,4 +282,4 @@ OPTIONS:
 
     -h, --help
             Print help information
-```
+#+end_example
