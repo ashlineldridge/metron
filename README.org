@@ -26,6 +26,8 @@ E.g. the =driver= crate could provide an interface like:
   }
 #+end_src
 
+*** Binaries
+- =simple_client.rs=: Parse command line arguments to create =core::profiler::Config= object which should contain the static configuration that would never need to change during the lifetime of a Metron process. When the profiler is run it is given a tx end of a queue to send info to the profiler
 ** Previous
 
 Metron is a load testing toolchain. The request rate can be controlled precisely

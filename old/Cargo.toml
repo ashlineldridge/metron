@@ -2,7 +2,7 @@
 name = "metron"
 authors = ["Ashlin Eldridge"]
 description = "Performance characterization tool"
-version = "0.2.0"
+version = "0.1.0"
 edition = "2021"
 
 [dependencies]

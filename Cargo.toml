@@ -1,9 +1,9 @@
 [workspace]
 members = [
-  "all-in-one",
+  "agent",
   "cli",
   "control-plane",
-  "driver",
+  "core",
   "echo-server",
-  "node",
+  "old",
 ]
