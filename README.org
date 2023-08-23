@@ -1,6 +1,16 @@
 * Metron
 
-** TODOs
+** Tasks
+*** TODO Create separate binaries
+It doesn't really matter how to slice it right now. Just create the facility to easily compose clap commands to be able to create standalone and aggregated binaries.
+
+Perhaps a couple of good binaries would be:
+- control-plane
+- echo-server
+- "all-in-one agent" (can use as: profiler, agent, "metronctl")
+*** TODO Where does "metronctl" code live in?
+I.e. the code that acts as the equiv of kubectl. It provides a CLI for talking to the control plane.
+
 
 Let the Cargo workspace structure be guided by the concept of a toolchain - each
 member crate provides a different specific tool. Potentially there is just a single
@@ -27,7 +37,8 @@ E.g. the =driver= crate could provide an interface like:
 #+end_src
 
 *** Binaries
-- =simple_client.rs=: Parse command line arguments to create =core::profiler::Config= object which should contain the static configuration that would never need to change during the lifetime of a Metron process. When the profiler is run it is given a tx end of a queue to send info to the profiler
+- =simple_client.rs=: Parse command line arguments to create =core::profiler::Config= object which should contain the static configuration that would never need to change during the lifetime of a Metron process. When the profiler is run it returns a handle/queue that allows plans/messages to be enqueued. In the case of a CLI you might run on a laptop, the binary would just enqueue the plan(s) that it derives from the command line or a config file that's passed in - and then it would spit out the results and exit. In the case of an agent that you'd run on a Kubernetes cluster the agent process would be a gRPC server that listens for messages (from the control plane) and then enqueues those messages. TODO: Think about the types of messages that might come from the control plane and flesh out the "Driver" (TODO: what's a better name for that?) and Handle interfaces.
+
 ** Previous
 
 Metron is a load testing toolchain. The request rate can be controlled precisely

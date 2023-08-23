@@ -1,4 +1,8 @@
-pub struct Client {}
+pub mod profiler;
+
+pub struct Agent {
+    // Badly named
+}
 
 pub struct Config {}
 
@@ -9,7 +13,7 @@ pub struct Plan {}
 pub struct Error {}
 
 impl Client {
-    pub fn new(config: Config) -> Self {
+    pub fn new(_config: Config) -> Self {
         todo!()
     }
 
@@ -19,7 +23,7 @@ impl Client {
 }
 
 impl Handle {
-    pub async fn enqueue(plan: Plan) -> Result<(), Error> {
+    pub async fn enqueue(_plan: Plan) -> Result<(), Error> {
         todo!()
     }
 

@@ -10,5 +10,5 @@ pub struct Profiler {}
 pub struct Config {}
 
 impl Profiler {
-    pub async fn run
+    // pub async fn run
 }
