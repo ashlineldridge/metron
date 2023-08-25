@@ -1,5 +1,5 @@
 [package]
-name = "metron"
+name = "metron-old"
 authors = ["Ashlin Eldridge"]
 description = "Performance characterization tool"
 version = "0.1.0"

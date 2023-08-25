@@ -307,13 +307,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2da6da31387c7e4ef160ffab6d5e7f00c42626fe39aea70a7b0f1773f7dd6c1b"
 
 [[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "core",
-]
-
-[[package]]
 name = "colorchoice"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -356,11 +349,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "control-plane"
-version = "0.1.0"
-
-[[package]]
-name = "core"
+name = "controller"
 version = "0.1.0"
 
 [[package]]
@@ -435,7 +424,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fea41bba32d969b513997752735605054bc0dfa92b4c56bf1189f2e174be7a10"
 
 [[package]]
-name = "echo-server"
+name = "echo"
 version = "0.1.0"
 
 [[package]]
@@ -837,6 +826,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "infra"
+version = "0.1.0"
+
+[[package]]
 name = "instant"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1033,6 +1026,18 @@ dependencies = [
 
 [[package]]
 name = "metron"
+version = "0.1.0"
+dependencies = [
+ "agent",
+ "controller",
+ "echo",
+ "infra",
+ "operator",
+ "proto",
+]
+
+[[package]]
+name = "metron-old"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1296,6 +1301,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "operator"
+version = "0.1.0"
+
+[[package]]
 name = "ordered-float"
 version = "2.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1466,6 +1475,10 @@ checksum = "213622a1460818959ac1181aaeb2dc9c7f63df720db7d788b3e24eacd1983e13"
 dependencies = [
  "prost",
 ]
+
+[[package]]
+name = "proto"
+version = "0.1.0"
 
 [[package]]
 name = "quanta"

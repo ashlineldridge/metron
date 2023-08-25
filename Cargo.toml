@@ -1,9 +1,11 @@
 [workspace]
 members = [
+  "_old",
   "agent",
-  "cli",
-  "control-plane",
-  "core",
-  "echo-server",
-  "old",
+  "controller",
+  "echo",
+  "infra",
+  "metron",
+  "operator",
+  "proto",
 ]

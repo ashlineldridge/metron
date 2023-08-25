@@ -1,0 +1,12 @@
+[package]
+name = "metron"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agent = { path = "../agent" }
+controller = { path = "../controller" }
+echo = { path = "../echo" }
+infra = { path = "../infra" }
+operator = { path = "../operator" }
+proto = { path = "../proto" }
