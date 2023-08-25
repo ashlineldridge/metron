@@ -25,7 +25,7 @@ const MULTIPLE_STARTS_ERROR: &str = "`Signaller` can only be started once";
 /// use crate::signaller::Signaller;
 ///
 /// use std::time::Duration;
-/// use metron::Rate;
+/// use metron_old::Rate;
 ///
 /// #[tokio::main]
 /// async fn main() {

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Result};
 use either::Either;
-use metron::{Header, Rate};
+use metron_old::{Header, Rate};
 use url::Url;
 use Either::{Left, Right};
 

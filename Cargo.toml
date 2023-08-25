@@ -1,11 +1,11 @@
 [workspace]
 members = [
-  "_old",
   "agent",
   "controller",
   "echo",
   "infra",
   "metron",
+  "metron_old",
   "operator",
   "proto",
 ]

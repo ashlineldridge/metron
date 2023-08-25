@@ -1,5 +1,5 @@
 use clap::value_parser;
-use metron::LogLevel;
+use metron_old::LogLevel;
 
 /// Creates the [`clap::Command`] for the `control` subcommand.
 ///

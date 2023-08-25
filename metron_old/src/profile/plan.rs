@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use metron::Rate;
+use metron_old::Rate;
 use serde::{Deserialize, Serialize};
 
 /// Timing plan for outbound requests.
@@ -156,7 +156,7 @@ impl<'a> Iterator for Ticks<'a> {
 /// # Examples
 /// ```
 /// use crate::plan::Builder;
-/// use metron::Rate;
+/// use metron_old::Rate;
 ///
 /// // Construct a plan that ramps up throughput from 10 RPS to 500 RPS over
 /// // the first 60 seconds and then maintains 500 RPS for a further 5 minutes.

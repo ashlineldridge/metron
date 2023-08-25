@@ -1037,7 +1037,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "metron-old"
+name = "metron_old"
 version = "0.1.0"
 dependencies = [
  "anyhow",
