@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package agent;
+
+message Config {
+  int32 port = 1;
+  string name = 2;
+}
+
+message AgentRequest {
+  string name = 1;
+}
+
+message AgentResponse {
+  repeated Result results = 1;
+}
+
+message Result {
+  string url = 1;
+  string title = 2;
+  repeated string snippets = 3;
+}
+
+service AgentService {
+  rpc Run(AgentRequest) returns (AgentResponse);
+}
