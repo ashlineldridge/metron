@@ -1,6 +1,10 @@
-use std::io::Result;
+fn main() -> Result<(), std::io::Error> {
+    tonic_build::configure()
+        .type_attribute(
+            "LinearRatePlanSegment",
+            "#[derive(serde::Deserialize, serde::Serialize)]",
+        )
+        .compile(&["src/metron.proto"], &["src"])?;
 
-fn main() -> Result<()> {
-    prost_build::compile_protos(&["src/agent.proto"], &["src/"])?;
     Ok(())
 }

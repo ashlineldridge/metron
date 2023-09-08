@@ -1,10 +1,17 @@
-use proto::agent::Config;
+// use proto::plan::{Plan, PlanSegment};
+// use proto::metron::
 
 fn main() {
-    let agent_config = Config {
-        port: 100,
-        name: "foobar".to_owned(),
-    };
+    // let segments = vec![
+    //     PlanSegment {
 
-    println!("Hello, world! {:?}", agent_config);
+    //     },
+    // ];
+    // let plan = Plan {
+    //     segments: todo!(),
+    //     target: todo!(),
+    // };
+
+    // println!("Hello, world! {:?}", plan);
+    todo!();
 }

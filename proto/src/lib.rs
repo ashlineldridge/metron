@@ -1,3 +1,3 @@
-pub mod agent {
-    include!(concat!(env!("OUT_DIR"), "/agent.rs"));
+pub mod metron {
+    tonic::include_proto!("metron");
 }
