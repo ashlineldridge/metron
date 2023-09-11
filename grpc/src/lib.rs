@@ -1,6 +1,10 @@
+mod metron {
+    tonic::include_proto!("metron");
+}
+
 use anyhow::Result;
 use async_trait::async_trait;
-use proto::metron::{agent_client::AgentClient, agent_server::Agent, TestPlan, TestReport};
+use metron::{agent_client::AgentClient, agent_server::Agent, TestPlan, TestReport};
 use tonic::transport::Channel;
 
 // TODO:
@@ -73,7 +77,7 @@ impl Agent for GrpcServer {
 impl Server for GrpcServer {
     async fn run(&self) -> Result<()> {
         let address = format!("[::1]:{}", self.port).parse()?;
-        let service = proto::metron::agent_server::AgentServer::new(self.clone());
+        let service = metron::agent_server::AgentServer::new(self.clone());
 
         tonic::transport::Server::builder()
             .add_service(service)
