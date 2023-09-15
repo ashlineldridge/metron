@@ -1,2 +1,2 @@
-mod agent;
+pub mod agent;
 mod controller;

@@ -1,11 +1,12 @@
 //! Entry point for the main `metron` binary.
 
 use anyhow::Result;
-use metron::core::{DefaultSignaller, Signaller};
+use metron::core::agent::Agent;
 
 fn main() -> Result<()> {
-    let signaller = DefaultSignaller {};
-    signaller.run(100)?;
+    let agent = Agent {
+        results_sink: todo!(),
+    };
 
     Ok(())
 }

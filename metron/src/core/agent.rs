@@ -1,4 +1,10 @@
-use std::{future::Future, pin::Pin, task::Poll};
+use std::{
+    future::Future,
+    pin::Pin,
+    sync::{Arc, Mutex},
+    task::Poll,
+    time::Instant,
+};
 
 use thiserror::Error;
 
@@ -12,7 +18,14 @@ pub enum Error {
 #[derive(Clone)]
 pub struct LoadTest {}
 
-pub struct TestResult {}
+#[derive(Debug)]
+pub struct Sample {
+    pub due: Instant,
+    pub sent: Instant,
+    pub done: Instant,
+    // TODO: This will need to become a type parameter or enum or something.
+    pub status: Result<u16, Error>,
+}
 
 // Agent is the actual thing that does the performance testing stuff
 // Write a Service implementation for Agent
@@ -25,24 +38,29 @@ pub struct TestResult {}
 // The gRPC server agent (Service implementation) is started by the "metron agent start --..." (or equiv)
 // Agent should
 
+///
 #[derive(Clone)]
 pub struct Agent<S> {
+    // There is not currently a strong need for this to be a Service but it might be useful later.
+    // Perhaps can
     results_sink: S,
 }
 
 impl<S> Agent<S>
 where
-    S: tower::Service<TestResult> + Clone + 'static,
+    S: tower::Service<Sample> + Clone + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    // What does the agent return?
-    // I want to give the agent a channel and have the agent send results in a typed format
-    // down the channel.
     pub async fn run(&mut self, _test: LoadTest) -> Result<(), Error> {
         // TODO: Execute the test plan (essentially call old Profiler code)
         // and have code send the results to the results_sink service.
-        let result = TestResult {};
-        if let Err(e) = self.results_sink.call(result).await {
+        let sample = Sample {
+            due: Instant::now(),
+            sent: Instant::now(),
+            done: Instant::now(),
+            status: Ok(200),
+        };
+        if let Err(e) = self.results_sink.call(sample).await {
             return Err(Error::SinkError(e.into()));
         }
 
@@ -50,15 +68,14 @@ where
     }
 }
 
-/// `Service` implementation that invokes
+/// `Service` implementation that invokes `Agent::run` directly.
 impl<S> tower::Service<LoadTest> for Agent<S>
 where
-    S: tower::Service<TestResult> + Clone + 'static,
+    S: tower::Service<Sample> + Clone + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = ();
     type Error = Error;
-    // TODO: Is this the Future type I should be using?
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
     fn poll_ready(
@@ -75,21 +92,101 @@ where
     }
 }
 
-pub struct GrpcServerAgent<S> {
-    inner: S,
+#[derive(Clone)]
+pub struct SimpleSink {
+    // TODO: Replace this with histrograms or OTEL or whatever.
+    counter: Arc<Mutex<u64>>,
 }
 
-/// `Service` implementation that invokes
+// But what about the simple application of an in-mem metrics db?
+// I guess I'd wrap it in an Arc which is Clone which seems correct.
+impl SimpleSink {
+    async fn sink(&mut self, _res: Sample) -> anyhow::Result<()> {
+        // TODO: Don't know why I can't use ? rather than unwrap() below.
+        // Also should it be a Tokio Mutex so it doesn't lock the entire thread?
+        let mut counter = self.counter.lock().unwrap();
+        *counter += 1;
+        Ok(())
+    }
+}
+
+impl tower::Service<Sample> for SimpleSink {
+    type Response = ();
+    type Error = Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    fn poll_ready(&mut self, _cx: &mut std::task::Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: Sample) -> Self::Future {
+        let mut clone = self.clone();
+        Box::pin(async move { clone.sink(req).await.map_err(Error::SinkError) })
+    }
+}
+
+pub struct GrpcServerAgent<S> {
+    inner: S,
+    port: u16,
+}
+
+impl<S> GrpcServerAgent<S> {
+    pub fn new(inner: S, port: u16) -> Self {
+        Self { inner, port }
+    }
+
+    // TODO: Change to use custom error for grpc package/crate
+    pub async fn run() -> anyhow::Result<()> {
+        // TODO: Actually start the gRPC server here.
+        Ok(())
+    }
+}
+
+// TODO: GrpcServerAgent potentially doesn't need to be a Service.
+// Have a look at Tonic as it will have preferences around  middlewear
+// already. Important thing is that the GrpcServerAgent wraps a
+// Service.
+/// `Service` implementation that runs a gRPC server.
 impl<R, S> tower::Service<R> for GrpcServerAgent<S>
 where
     S: tower::Service<R> + Clone + 'static,
     R: 'static,
-    // S::Response: Into<()>,
-    // S::Error: std::error::Error + Send + Sync + 'static,
 {
     type Response = S::Response;
     type Error = S::Error;
-    // TODO: Is this the Future type I should be using?
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: R) -> Self::Future {
+        // See https://docs.rs/tower/latest/tower/trait.Service.html#be-careful-when-cloning-inner-services.
+        let clone = self.inner.clone();
+        let mut inner = std::mem::replace(&mut self.inner, clone);
+        Box::pin(async move { inner.call(req).await })
+    }
+}
+
+// TODO: If the tower load balancing mechanism isn't an exact fit, could I write my own that follows same pattern?
+// use tower::{balance::p2c::Balance, load::Load};
+
+#[derive(Clone)]
+pub struct Controller<S> {
+    agents: Vec<Agent<S>>,
+}
+
+/// `Service` implementation that balances load across agetns.
+impl<S> tower::Service<LoadTest> for Controller<S>
+where
+    S: tower::Service<Sample> + Clone + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
+{
+    type Response = ();
+    type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
     fn poll_ready(
@@ -99,17 +196,11 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: R) -> Self::Future {
-        let clone = self.inner.clone();
-        let mut inner = std::mem::replace(&mut self.inner, clone);
-        Box::pin(async move { inner.call(req).await })
+    fn call(&mut self, req: LoadTest) -> Self::Future {
+        // TODO: Balance load across the agents.
+        todo!()
     }
 }
-
-// pub struct Controller<C> {
-//     connect: C,
-//     agents: Vec<Agent<>>,
-// }
 
 // // This is where I need to make the "breakthrough". Define the ADT model here.
 // // What is a tower_service::Service? Why?

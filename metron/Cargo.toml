@@ -6,4 +6,4 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.75"
 thiserror = "1.0.48"
-tower = "0.4.13"
+tower = { version = "0.4.13", features = ["balance"] }
