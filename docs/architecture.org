@@ -1,0 +1,83 @@
+* Architecture
+
+An =Agent= provides the concrete implementation for running a load test. It is a struct that composes a sink to which it sends real-time test results.
+
+#+begin_src rust
+  pub struct Agent<S> {
+      sink: S,
+  }
+#+end_src
+
+A sink is a =tower::Service<Sample>= where =Sample= represents the result of a single test request sent by an =Agent=. Each test result is submitted to the sink as a =Sample=. This provides us with quite a bit of flexibility when building sinks. We could have an OpenTelemetry sink that sends OTLP metrics to an upstream collector endpoint. We could have an in-memory HDR histogram sink for aggregating high-precision latency metrics. We could even compose multiple sinks so that we could forward results to multiple destinations.
+
+=Agent= can also be represented as =tower::Service<LoadTest>=. It is a service that is given a load test and returns a future =Result<(), AgentError>=. The returned future provides a final success/failure result when the test completes, however statistical test results are streamed in real-time to the sink.
+
+#+begin_src rust
+  impl<S> tower::Service<LoadTest> for Agent<S>
+  where
+      S: tower::Service<Sample> + Clone + 'static,
+      S::Error: std::error::Error + Send + Sync + 'static,
+  {
+      // ...
+  }
+#+end_src
+
+A =Controller= provides the concrete implementation for the component that is responsible for executing a load test across one or more agents (themselves represented as implementations of =tower::Service=).
+=Controller= also provides a =tower::Service= implementation that mirrors the =tower::Service= implementation for =Agent=.
+
+#+begin_src rust
+  pub struct Controller<S> {
+    agents: Vec<S>,
+  }
+
+  impl<S> tower::Service<LoadTest> for Controller<S>
+  where
+      S: tower::Service<LoadTest> + Clone + 'static,
+      S::Error: std::error::Error + Send + Sync + 'static,
+  {
+      // ...
+  }
+#+end_src
+
+A =Controller= is effectively a load balancing proxy layer - ideally, Tower's load balancing and layer componentry will make this really clean.
+
+This design allows us to compose agents and controllers in interesting ways. When running Metron locally as a single self-contained binary, we have a few options:
+
+#+begin_src rust
+  let sink = OtelSink::new("http://localhost:3717");
+  let agent = Agent::new(sink);
+  let controller = Controller::new(vec![agent]);
+
+  let load_test = LoadTest::new(
+      plan: todo!(),
+  );
+  controller.call(load_test).await?;
+
+  // Alternatively, perhaps there is no need for the Controller layer here. Perhaps
+  // Controller could be purely a load balancing component.
+#+end_src
+
+But this design really starts to shine when running in a distributed environment.
+
+#+begin_src rust
+  // On a gRPC server agent node:
+  let sink = OtelSink::new("http://otel-collector:3717");
+  let agent = Agent::new(sink);
+  // Server's run method starts the gRPC server on the supplied port.
+  let server = GrpcServerAgent::new(agent, 8181);
+
+  // In the client binary:
+  let agent1 = GrpcClientAgent::new("http://10.0.0.1:8181");
+  let agent2 = GrpcClientAgent::new("http://10.0.0.2:8181");
+  let agent3 = GrpcClientAgent::new("http://10.0.0.3:8181");
+  let controller = Controller::new(vec![
+      agent1,
+      agent2,
+      agent3,
+  ]);
+
+  let load_test = LoadTest::new(
+      plan: todo!(),
+  );
+  controller.call(load_test).await?;
+#+end_src

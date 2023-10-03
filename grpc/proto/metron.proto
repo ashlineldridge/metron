@@ -2,33 +2,14 @@ syntax = "proto3";
 
 import "google/protobuf/duration.proto";
 
-package metron;
+package proto;
 
 service Agent {
-  rpc Run (TestPlan) returns (TestReport);
+  rpc RunLoadTest (LoadTestRequest) returns (LoadTestResponse);
+  rpc GetAgentState (AgentStateRequest) returns (AgentStateResponse);
 }
 
-message TestReport {
-  string target = 1;
-  uint64 total_requests = 2;
-  google.protobuf.Duration total_duration = 3;
-  repeated ReportSection response_latency = 4;
-  repeated ReportSection error_latency = 5;
-  repeated ReportSection request_delay = 6;
-}
-
-message ReportSection {
-  uint32 status_code = 1;
-  uint64 total_requests = 2;
-  repeated ReportPercentile percentiles = 3;
-}
-
-message ReportPercentile {
-  double percentile = 1;
-  google.protobuf.Duration duration = 2;
-}
-
-message TestPlan {
+message LoadTestRequest {
   repeated Segment segments = 1;
   string target = 2;
 }
@@ -42,17 +23,17 @@ message Segment {
 
 message FixedRateSegment {
   float rate = 1;
-  string duration = 2;
+  google.protobuf.Duration total_duration = 2;
 }
 
 message LinearRateSegment {
   float rate_start = 1;
   float rate_end = 2;
-  string duration = 3;
+  google.protobuf.Duration total_duration = 3;
 }
 
-// TODO: Read:
-// https://protobuf.dev/programming-guides/proto3/
-// https://www.fpcomplete.com/blog/axum-hyper-tonic-tower-part4/
-// Don't think we need to use Interceptors but this description
-// gives some good context and links https://docs.rs/tonic/latest/tonic/service/trait.Interceptor.html
+message LoadTestResponse {}
+
+message AgentStateRequest {}
+
+message AgentStateResponse {}

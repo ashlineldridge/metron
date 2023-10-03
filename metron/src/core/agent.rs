@@ -15,6 +15,7 @@ pub enum Error {
     #[error("could not write test results to sink")]
     SinkError(#[from] anyhow::Error),
 }
+
 #[derive(Clone)]
 pub struct LoadTest {}
 
@@ -41,9 +42,7 @@ pub struct Sample {
 ///
 #[derive(Clone)]
 pub struct Agent<S> {
-    // There is not currently a strong need for this to be a Service but it might be useful later.
-    // Perhaps can
-    results_sink: S,
+    sink: S,
 }
 
 impl<S> Agent<S>
@@ -51,7 +50,11 @@ where
     S: tower::Service<Sample> + Clone + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    pub async fn run(&mut self, _test: LoadTest) -> Result<(), Error> {
+    pub fn new(sink: S) -> Self {
+        Self { sink }
+    }
+
+    pub async fn run(&mut self, _test: &LoadTest) -> Result<(), Error> {
         // TODO: Execute the test plan (essentially call old Profiler code)
         // and have code send the results to the results_sink service.
         let sample = Sample {
@@ -60,7 +63,7 @@ where
             done: Instant::now(),
             status: Ok(200),
         };
-        if let Err(e) = self.results_sink.call(sample).await {
+        if let Err(e) = self.sink.call(sample).await {
             return Err(Error::SinkError(e.into()));
         }
 
@@ -87,8 +90,8 @@ where
 
     fn call(&mut self, req: LoadTest) -> Self::Future {
         // TODO: Perhaps check if load test is currently running?
-        let mut clone = self.clone();
-        Box::pin(async move { clone.run(req).await })
+        let mut cloned = self.clone();
+        Box::pin(async move { cloned.run(&req).await })
     }
 }
 
@@ -101,12 +104,24 @@ pub struct SimpleSink {
 // But what about the simple application of an in-mem metrics db?
 // I guess I'd wrap it in an Arc which is Clone which seems correct.
 impl SimpleSink {
+    pub fn new() -> Self {
+        Self {
+            counter: Arc::new(Mutex::new(0)),
+        }
+    }
+
     async fn sink(&mut self, _res: Sample) -> anyhow::Result<()> {
         // TODO: Don't know why I can't use ? rather than unwrap() below.
         // Also should it be a Tokio Mutex so it doesn't lock the entire thread?
         let mut counter = self.counter.lock().unwrap();
         *counter += 1;
         Ok(())
+    }
+}
+
+impl Default for SimpleSink {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -125,51 +140,64 @@ impl tower::Service<Sample> for SimpleSink {
     }
 }
 
-pub struct GrpcServerAgent<S> {
-    inner: S,
-    port: u16,
-}
+// pub struct GrpcServerAgent<S> {
+//     inner: S,
+//     port: u16,
+// }
 
-impl<S> GrpcServerAgent<S> {
-    pub fn new(inner: S, port: u16) -> Self {
-        Self { inner, port }
-    }
+// impl<S> GrpcServerAgent<S> {
+//     pub fn new(inner: S, port: u16) -> Self {
+//         Self { inner, port }
+//     }
 
-    // TODO: Change to use custom error for grpc package/crate
-    pub async fn run() -> anyhow::Result<()> {
-        // TODO: Actually start the gRPC server here.
-        Ok(())
-    }
-}
+//     // TODO: Change to use custom error for grpc package/crate
+//     pub async fn run() -> anyhow::Result<()> {
+//         // TODO: Actually start the gRPC server here.
+//         Ok(())
+//     }
+// }
 
-// TODO: GrpcServerAgent potentially doesn't need to be a Service.
-// Have a look at Tonic as it will have preferences around  middlewear
-// already. Important thing is that the GrpcServerAgent wraps a
-// Service.
-/// `Service` implementation that runs a gRPC server.
-impl<R, S> tower::Service<R> for GrpcServerAgent<S>
-where
-    S: tower::Service<R> + Clone + 'static,
-    R: 'static,
-{
-    type Response = S::Response;
-    type Error = S::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+// // TODO: GrpcServerAgent potentially doesn't need to be a Service.
+// // Have a look at Tonic as it will have preferences around  middlewear
+// // already. Important thing is that the GrpcServerAgent wraps a
+// // Service.
+// /// `Service` implementation that runs a gRPC server.
+// impl<R, S> tower::Service<R> for GrpcServerAgent<S>
+// where
+//     S: tower::Service<R> + Clone + 'static,
+//     R: 'static,
+// {
+//     type Response = S::Response;
+//     type Error = S::Error;
+//     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
-    fn poll_ready(
-        &mut self,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
-    }
+//     fn poll_ready(
+//         &mut self,
+//         cx: &mut std::task::Context<'_>,
+//     ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
+//         self.inner.poll_ready(cx)
+//     }
 
-    fn call(&mut self, req: R) -> Self::Future {
-        // See https://docs.rs/tower/latest/tower/trait.Service.html#be-careful-when-cloning-inner-services.
-        let clone = self.inner.clone();
-        let mut inner = std::mem::replace(&mut self.inner, clone);
-        Box::pin(async move { inner.call(req).await })
-    }
-}
+//     fn call(&mut self, req: R) -> Self::Future {
+//         // See https://docs.rs/tower/latest/tower/trait.Service.html#be-careful-when-cloning-inner-services.
+//         let clone = self.inner.clone();
+//         let mut inner = std::mem::replace(&mut self.inner, clone);
+//         Box::pin(async move { inner.call(req).await })
+//     }
+// }
+
+// pub struct LogLayer {}
+
+// impl<S> tower::Layer<S> for LogLayer {
+//     type Service = LogService<S>;
+
+//     // fn layer(&self, service: S) -> Self::Service {
+//     //     // LogService {
+//     //     //     target: self.target,
+//     //     //     service,
+//     //     // }
+//     // }
+// }
 
 // TODO: If the tower load balancing mechanism isn't an exact fit, could I write my own that follows same pattern?
 // use tower::{balance::p2c::Balance, load::Load};
@@ -196,7 +224,7 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: LoadTest) -> Self::Future {
+    fn call(&mut self, _req: LoadTest) -> Self::Future {
         // TODO: Balance load across the agents.
         todo!()
     }

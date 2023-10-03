@@ -1,2 +1,4 @@
 pub mod agent;
-mod controller;
+pub mod controller;
+
+pub use agent::LoadTest;
