@@ -1,17 +1,19 @@
 //! Entry point for the main `metron` binary.
 
-use anyhow::{bail, Result};
-use grpc::server::GrpcServerAgent;
-use metron::core::{
-    agent::{Agent, SimpleSink},
-    LoadTest,
-};
+use std::env;
+
+use anyhow::{Context, Result};
+use cli::CommandSpec;
+use metron::core::TestPlan;
 
 pub enum Config {
     RunSpec(),
     AgentSpec(),
     ControlSpec(),
 }
+
+// TODO: - Make this repo focused on the core functionality (i.e. agent + controller + runner + grpc + etc)
+//       - Make other repos called metron-operator and metron-provisioner or something to that effect
 
 // Different ways to run this thing
 // 1. metron run --rate 500 --duration 5m --target http://localhost:8080
@@ -22,7 +24,7 @@ pub enum Config {
 //    - Run Metron as a local controller talking to a remote agent
 //    - Multiple agents can be specified
 //    - Also supports service discovery of agents (like Prom)
-//    - Advanced config may require config file
+//    - Advanced config may require config file (e.g. just specify --file test-plan.yaml - supported by all commands)
 // 4. metron control --port 9191 --agent localhost:9090
 //    - Run Metron as a gRPC server controller
 //    - Multiple agents can be specified
@@ -41,34 +43,49 @@ pub enum Config {
 //    - Run Metron as a Kubernetes operator
 #[tokio::main]
 async fn main() -> Result<()> {
-    let run_method = "grpc-server";
-    match run_method {
-        "standalone" => {
-            // Standalone mode would require a load test to be supplied.
-            let test = LoadTest {};
-            run_standalone_agent(&test).await?
-        }
-        "grpc-server" => run_grpc_server_agent().await?,
-        _ => bail!("unknown run method"),
+    let config = cli::parse(env::args_os())?;
+    match config {
+        CommandSpec::Run() => todo!(),
+        CommandSpec::Agent() => todo!(),
+        CommandSpec::Control() => todo!(),
+        CommandSpec::Help(msg) => println!("{msg}"),
     };
 
+    // let matches = cli::command().get_matches();
+    // let (subcommand, args) = matches.subcommand().context("missing subcommand")?;
+
+    // println!("Got subcommand: {}", subcommand);
+    // println!("Got args: {:?}", args);
+
+    // let run_method = "grpc-server";
+    // match run_method {
+    //     "standalone" => {
+    //         // Standalone mode would require a load test to be supplied.
+    //         let test = TestPlan {};
+    //         run_standalone_agent(&test).await?
+    //     }
+    //     "grpc-server" => run_grpc_server_agent().await?,
+    //     _ => bail!("unknown run method"),
+    // };
+
     Ok(())
 }
 
-async fn run_standalone_agent(test: &LoadTest) -> Result<()> {
-    let sink = SimpleSink::new();
+async fn _run_standalone_agent(_test: &TestPlan) -> Result<()> {
+    // let sink = SimpleSink::new();
     // TODO: Avoid mut?
-    let mut agent = Agent::new(sink);
+    // let mut agent = Agent::new(sink);
 
-    agent.run(test).await?;
+    // agent.run(test).await?;
 
-    Ok(())
+    // Ok(())
+    todo!()
 }
 
-async fn run_grpc_server_agent() -> Result<()> {
-    let sink = SimpleSink::new();
-    let agent = Agent::new(sink);
-    let agent = GrpcServerAgent::new(agent, 8181);
+async fn _run_grpc_server_agent() -> Result<()> {
+    // let sink = SimpleSink::new();
+    // let agent = Agent::new(sink);
+    // let agent = GrpcServerAgent::new(agent, 8181);
     // agent.run();
 
     todo!()

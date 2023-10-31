@@ -1,26 +1,29 @@
 use clap::{value_parser, ArgAction};
-use metron_old::{HttpMethod, LogLevel};
+use metron::core::LogLevel;
 
-use crate::{cli::parser, profile::SignallerKind};
+use crate::parser;
 
-/// Creates the [`clap::Command`] for the `profile` subcommand.
+// use metron_old::{HttpMethod, LogLevel};
+
+// use crate::{cli::parser, profile::SignallerKind};
+
+/// Creates the [`clap::Command`] for the `run` subcommand.
 ///
 /// # Examples
 /// ```bash
-/// metron profile \
+/// metron run \
 ///   --rate 100 \
 ///   --duration 20s \
-///   https://example.com
+///   --target https://example.com
 /// ```
 pub fn command() -> clap::Command {
-    const SHORT: &str = "Runs a performance profile test.";
+    const SHORT: &str = "Run a load test.";
     const LONG: &str = "\
-Runs a performance test against the specified target(s) and produces a report.
-
-The report can be written to stdout and/or streamed to a metrics backend.
+This command is used to run a load test according to a test plan and stream
+the results to a number of potential backends.
 ";
 
-    clap::Command::new("profile")
+    clap::Command::new("run")
         .about(SHORT)
         .long_about(LONG)
         .args(all_args())
@@ -177,7 +180,7 @@ and a payload is specified then HTTP POST will be assumed.
         .long("http-method")
         .value_name("METHOD")
         .default_value("get")
-        .value_parser(value_parser!(HttpMethod))
+        // .value_parser(value_parser!(HttpMethod))
         .help(SHORT)
         .long_help(LONG)
 }
@@ -317,7 +320,7 @@ generally be what you want.
         .long("signaller")
         .value_name("NAME")
         .default_value("blocking")
-        .value_parser(value_parser!(SignallerKind))
+        // .value_parser(value_parser!(SignallerKind))
         .help(SHORT)
         .long_help(LONG)
 }

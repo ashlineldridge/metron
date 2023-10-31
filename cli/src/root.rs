@@ -1,12 +1,24 @@
-use crate::cli::{control, echo, node, operator, profile};
+use crate::{agent, control, run};
 
-const ABOUT: &str = "
+const ABOUT: &str = "\
 Metron is a modern load testing toolchain.
 
-Use --help for more details.
+Use -h for short help and --help for extended help.
 
-Project home: https://github.com/ashlineldridge/metron
-";
+Project home: https://github.com/ashlineldridge/metron";
+
+const USAGE: &str = "\
+metron <COMMAND> <OPTIONS>";
+
+const HELP_TEMPLATE: &str = "\
+{name} {version}
+{author}
+
+{about}
+
+{usage-heading} {usage}
+
+{all-args}";
 
 /// Returns the root [`clap::Command`] for the application.
 pub fn command() -> clap::Command {
@@ -16,22 +28,17 @@ pub fn command() -> clap::Command {
         .author(crate_authors!())
         .version(crate_version!())
         .about(ABOUT)
-        .arg_required_else_help(true)
-        .subcommands(all_subcommands())
+        .override_usage(USAGE)
+        .help_template(HELP_TEMPLATE)
         .subcommand_required(true)
+        .subcommands(all_subcommands())
 }
 
 fn all_subcommands() -> Vec<clap::Command> {
-    vec![
-        operator::command(),
-        echo::command(),
-        node::command(),
-        profile::command(),
-        control::command(),
-    ]
-    .into_iter()
-    .map(|c| c.args(common_args()).groups(common_arg_groups()))
-    .collect()
+    vec![agent::command(), control::command(), run::command()]
+        .into_iter()
+        .map(|c| c.args(common_args()).groups(common_arg_groups()))
+        .collect()
 }
 
 /// Returns the [`clap::Arg`]s common to all subcommands.

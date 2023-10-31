@@ -8,6 +8,35 @@ use std::{
 
 use thiserror::Error;
 
+// Aha! This is still an agent. It should be run in the same steps as it would be when
+// deployed distributed. E.g.
+// let config = cli::parse()?;
+// match config {
+//     RunConfig(agent_config: core::agent::Config, load_test: core::LoadTest, log_level: LogLevel) => {
+//         let agent = Agent::new(agent_config);
+//         let result = agent.run(load_test)?;
+//         ...
+//         // Is this right? Better way?
+//     },
+//     ...
+// }
+// let agent =
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct Config {
+    pub segments: Vec<PlanSegment>,
+    pub connections: usize,
+    pub http_method: HttpMethod,
+    pub targets: Vec<Url>,
+    pub headers: Vec<Header>,
+    pub payload: Option<String>,
+    pub runtime: runtime::Config,
+    pub signaller_kind: SignallerKind,
+    pub no_latency_correction: bool,
+    pub stop_on_client_error: bool,
+    pub stop_on_non_2xx: bool,
+    pub log_level: LogLevel,
+}
+
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
@@ -17,7 +46,9 @@ pub enum Error {
 }
 
 #[derive(Clone)]
-pub struct LoadTest {}
+pub struct LoadTest {
+    name: String,
+}
 
 #[derive(Debug)]
 pub struct Sample {

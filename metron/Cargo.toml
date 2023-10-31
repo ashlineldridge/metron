@@ -5,5 +5,9 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
+clap = { version = "4.4.6", features = ["derive"] }
+humantime-serde = "1.1.1"
+serde = { version = "1.0.189", features = ["derive"] }
 thiserror = "1.0.48"
 tower = { version = "0.4.13", features = ["balance"] }
+url = { version = "2.4.1", features = ["serde"] }

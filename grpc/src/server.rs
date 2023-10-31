@@ -35,7 +35,7 @@ impl<S> GrpcServerAgent<S> {
 #[tonic::async_trait]
 impl<S> agent_server::Agent for GrpcServerAgent<S>
 where
-    S: tower::Service<core::LoadTest> + Send + Sync + 'static,
+    S: tower::Service<core::TestPlan> + Send + Sync + 'static,
 {
     async fn run_load_test(
         &self,
