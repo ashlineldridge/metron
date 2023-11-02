@@ -3,6 +3,7 @@ name = "metron"
 version = "0.1.0"
 edition = "2021"
 
+# TODO: Some of these dependencies/features can be removed.
 [dependencies]
 anyhow = "1.0.75"
 clap = { version = "4.4.6", features = ["derive"] }

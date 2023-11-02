@@ -2,7 +2,7 @@ mod proto {
     tonic::include_proto!("proto");
 }
 
-use metron::core;
+use metron::core::Plan;
 use proto::{
     agent_server, AgentStateRequest, AgentStateResponse, LoadTestRequest, LoadTestResponse,
 };
@@ -35,7 +35,7 @@ impl<S> GrpcServerAgent<S> {
 #[tonic::async_trait]
 impl<S> agent_server::Agent for GrpcServerAgent<S>
 where
-    S: tower::Service<core::TestPlan> + Send + Sync + 'static,
+    S: tower::Service<Plan> + Send + Sync + 'static,
 {
     async fn run_load_test(
         &self,

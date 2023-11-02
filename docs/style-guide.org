@@ -1,0 +1,66 @@
+* Style Guide
+
+This is a simple coding style guide for the Metron codebase. Where practical, style should be enforced via the project's [[file:~/dev/home/metron/rustfmt.toml][rustfmt.toml]] file. This document aims to provide useful advice for higher-level style concerns that can't be enforced by =rustfmt=.
+
+TODO: How are you going to check that either --config-file or --rate is specified (for example)?
+TODO: What about if some value inside the config file is missing?
+TODO: Grrr...
+
+** Code Comments
+*** Function Comments
+Short comments should be worded in the imperative mood. For example, the following is correct:
+
+#+begin_src rust
+  /// Find the `Thing` with ID `id`.
+  fn find_thing(&self, id: &str) -> Option<Thing> { todo!() }
+#+end_src
+
+While the following should be avoided:
+
+#+begin_src rust
+  /// Finds the `Thing` with ID `id`.
+  fn find_thing(&self, id: &str) -> Option<Thing> { todo!() }
+#+end_src
+
+** Scratch
+#+begin_src rust
+  // TODO:
+  // Call the profiler "runner" and pare everything back -
+  // get the language right in terms of packages, types, etc.
+  // Runner can be pretty much empty - just get the interfaces
+  // right. Get the subcommands and arguments, error handling,
+  // etc right, logging, etc, right first.
+  // Consider whether it's better to provide --config-file at
+  // the top-level (i.e. rather than subcommands) and have the
+  // config file describe everything.
+
+  // TODO: - Make this repo focused on the core functionality (i.e. agent + controller + runner + grpc + etc)
+  //       - Make other repos called metron-operator and metron-provisioner or something to that effect
+
+  // Different ways to run this thing
+  // 1. metron run --rate 500 --duration 5m --target http://localhost:8080
+  //    - Run Metron as an all-in-one unit
+  // 2. metron agent --port 9090
+  //    - Run Metron as a gRPC server agent
+  // 3. metron run --rate 500 --duration 5m --target http://localhost:8080 --agent localhost:9090
+  //    - Run Metron as a local controller talking to a remote agent
+  //    - Multiple agents can be specified
+  //    - Also supports service discovery of agents (like Prom)
+  //    - Advanced config may require config file (e.g. just specify --file test-plan.yaml - supported by all commands)
+  // 4. metron controller --port 9191 --agent localhost:9090
+  //    - Run Metron as a gRPC server controller
+  //    - Multiple agents can be specified
+  //    - Also supports service discovery of agents (like Prom)
+  //    - Advanced config may require config file
+  // 5. metron run --rate 500 --duration 5m --target http://localhost:8080 --agent localhost:9191
+  //    - Run Metron as a local controller talking to a remote controller
+  //    - From the client's perspective there is no difference between a remote agent and a remote controller
+  // 6. metron provision --platform fargate --cluster-name foo --num-agents 100 --provision-controller true
+  //    - Provision a Fargate pool of 100 agents managed by a controller (controller is given service discovery configuration to find the agents)
+  //    - Alternatively, can be provisioned without a controller
+  //    - In either case, `metron run` can be called and told about the agents or the controller
+  // 7. metron destroy --platform fargate --cluster-name foo
+  //    - Destroy a Fargate cluster
+  // 8. metrond
+  //    - Run Metron as a Kubernetes operator
+#+end_src

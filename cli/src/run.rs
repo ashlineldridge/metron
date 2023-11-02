@@ -1,11 +1,14 @@
+use std::time::Duration;
+
 use clap::{value_parser, ArgAction};
-use metron::core::LogLevel;
+use either::Either::{Left, Right};
+use metron::core::{PlanSegment, RunnerConfig};
+use url::Url;
 
-use crate::parser;
-
-// use metron_old::{HttpMethod, LogLevel};
-
-// use crate::{cli::parser, profile::SignallerKind};
+use crate::{
+    parser::{self, RateArgValue},
+    CLAP_EXPECT,
+};
 
 /// Creates the [`clap::Command`] for the `run` subcommand.
 ///
@@ -31,40 +34,140 @@ the results to a number of potential backends.
         .disable_version_flag(true)
 }
 
+pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<RunnerConfig, clap::Error> {
+    let mut config = matches
+        .get_one::<RunnerConfig>("config-file")
+        .cloned()
+        .unwrap_or_default();
+
+    let rates = matches.get_many::<RateArgValue>("rate").expect(CLAP_EXPECT);
+    let durations = matches
+        .get_many::<Option<Duration>>("duration")
+        .expect(CLAP_EXPECT);
+
+    if rates.len() != durations.len() {
+        return Err(command().error(
+            clap::error::ErrorKind::WrongNumberOfValues,
+            "The number of --rate and --duration arguments must match",
+        ));
+    }
+
+    let mut it = rates.zip(durations).peekable();
+    while let Some((&rate, &duration)) = it.next() {
+        // Check that only the last duration value is infinite.
+        if duration.is_none() && it.peek().is_some() {
+            return Err(command().error(
+                clap::error::ErrorKind::ValueValidation,
+                "Only the last --duration value can be \"forever\"",
+            ));
+        }
+
+        let segment = match rate {
+            Left(rate) => PlanSegment::Fixed { rate, duration },
+            Right((rate_start, rate_end)) => {
+                if let Some(duration) = duration {
+                    PlanSegment::Linear {
+                        rate_start,
+                        rate_end,
+                        duration,
+                    }
+                } else {
+                    return Err(command().error(
+                        clap::error::ErrorKind::ValueValidation,
+                        "Only fixed-rate segments may have a --duration value can be \"forever\"",
+                    ));
+                }
+            }
+        };
+
+        config.segments.push(segment);
+    }
+
+    config.connections = *matches.get_one::<u64>("connections").expect(CLAP_EXPECT) as usize;
+    config.http_method = *matches.get_one("http-method").expect(CLAP_EXPECT);
+    config.targets = matches
+        .get_many::<Url>("target")
+        .expect(CLAP_EXPECT)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    config.headers = matches
+        .get_many("header")
+        .unwrap_or_default()
+        .cloned()
+        .collect();
+
+    config.payload = matches.get_one::<String>("payload").cloned();
+    config.latency_correction = *matches.get_one("latency-correction").expect(CLAP_EXPECT);
+
+    Ok(config)
+}
+
 /// Returns all [`clap::Arg`]s for the `profile` subcommand.
 fn all_args() -> Vec<clap::Arg> {
     vec![
+        arg_config_file(),
+        arg_print_config(),
         arg_rate(),
         arg_duration(),
         arg_target(),
         arg_http_method(),
         arg_payload(),
-        arg_payload_file(),
         arg_header(),
         arg_worker_threads(),
-        arg_single_threaded(),
         arg_connections(),
-        arg_signaller(),
-        arg_no_latency_correction(),
-        arg_stop_on_client_error(),
-        arg_stop_on_non_2xx(),
-        arg_log_level(),
+        arg_latency_correction(),
     ]
 }
 
 /// Returns the [`clap::ArgGroup`]s for the `profile` subcommand.
 fn all_arg_groups() -> Vec<clap::ArgGroup> {
-    vec![arg_group_payload(), arg_group_thread_model()]
-}
-
-/// Returns the [`clap::ArgGroup`] for the arguments that decide the request payload.
-fn arg_group_payload() -> clap::ArgGroup {
-    clap::ArgGroup::new("group-payload").multiple(false)
+    vec![arg_group_thread_model()]
 }
 
 /// Returns the [`clap::ArgGroup`] for the arguments that decide the thread model.
 fn arg_group_thread_model() -> clap::ArgGroup {
     clap::ArgGroup::new("group-thread-model").multiple(false)
+}
+
+/// Returns the [`clap::Arg`] for `--config-file`.
+fn arg_config_file() -> clap::Arg {
+    const SHORT: &str = "Run configuration file.";
+    const LONG: &str = "\
+A configuration file to be used as an alternative to individual command line
+arguments. Stdin can also be used by specifying hyphen as the file name (i.e.
+`--config-file -`).
+
+When both a configuration file and individual command line arguments are used,
+the arguments will override their counterpart properties in the configuration
+file.
+
+See --print-config for bootstrapping a configuration file.
+";
+
+    clap::Arg::new("config-file")
+        .long("config-file")
+        .value_name("FILE")
+        .value_parser(parser::config_file::<RunnerConfig>)
+        .help(SHORT)
+        .long_help(LONG)
+}
+
+/// Returns the [`clap::Arg`] for `--print-config`.
+fn arg_print_config() -> clap::Arg {
+    const SHORT: &str = "Print the controller configuration.";
+    const LONG: &str = "\
+Generates the configuration for this command and prints it to stdout. This may
+be used to bootstrap a configuration file based on command line arguments so
+that a configuration file can be used rather than individual command line
+arguments.
+";
+
+    clap::Arg::new("print-config")
+        .long("print-config")
+        .action(ArgAction::SetTrue)
+        .help(SHORT)
+        .long_help(LONG)
 }
 
 /// Returns the [`clap::Arg`] for `--rate`.
@@ -198,28 +301,8 @@ then an empty payload will be used.
 
     clap::Arg::new("payload")
         .long("payload")
-        .group("group-payload")
         .value_name("PAYLOAD")
         .value_parser(value_parser!(String))
-        .help(SHORT)
-        .long_help(LONG)
-}
-
-/// Returns the [`clap::Arg`] for `--payload-file`.
-fn arg_payload_file() -> clap::Arg {
-    const SHORT: &str = "HTTP payload file.";
-    const LONG: &str = "\
-Sets the HTTP payload file to use when making requests of the target.
-
-If a payload-based HTTP method such as POST or PUT has been specified
-(--http-method), and no payload has been specified (--payload or --payload-file)
-then an empty payload will be used.
-";
-
-    clap::Arg::new("payload-file")
-        .long("payload-file")
-        .group("group-payload")
-        .value_name("FILE")
         .help(SHORT)
         .long_help(LONG)
 }
@@ -266,29 +349,6 @@ This argument defaults to the number of cores on the host machine.
         .long_help(LONG)
 }
 
-/// Returns the [`clap::Arg`] for `--single-threaded`.
-fn arg_single_threaded() -> clap::Arg {
-    const SHORT: &str = "Don't spawn threads.";
-    const LONG: &str = "\
-Forces all operations to run on the main thread.
-
-The utility of this argument is unknown beyond providing interesting data on how
-the number of threads affects performance of the tool itself. This argument
-forces all operations to run on the main thread whereas --worker-threads=1 will
-result in the main thread creating a single worker thread to perform the
-requests.
-
-This argument is incompatible with --worker-threads and --signaller=blocking.
-";
-
-    clap::Arg::new("single-threaded")
-        .long("single-threaded")
-        .group("group-thread-model")
-        .action(ArgAction::SetTrue)
-        .help(SHORT)
-        .long_help(LONG)
-}
-
 /// Returns the [`clap::Arg`] for `--connections`.
 fn arg_connections() -> clap::Arg {
     const SHORT: &str = "Number of TCP connections to use.";
@@ -307,94 +367,20 @@ TODO: Elaborate.
         .long_help(LONG)
 }
 
-/// Returns the [`clap::Arg`] for `--signaller`.
-fn arg_signaller() -> clap::Arg {
-    const SHORT: &str = "Method for generating timing signals.";
+/// Returns the [`clap::Arg`] for `--latency-correction`.
+fn arg_latency_correction() -> clap::Arg {
+    const SHORT: &str = "Enable/disable latency correction.";
     const LONG: &str = "\
-Selects the type of signalling system that should be used to generate request
-timing signals. This is an advanced feature and the default behaviour will
-generally be what you want.
-";
-
-    clap::Arg::new("signaller")
-        .long("signaller")
-        .value_name("NAME")
-        .default_value("blocking")
-        // .value_parser(value_parser!(SignallerKind))
-        .help(SHORT)
-        .long_help(LONG)
-}
-
-/// Returns the [`clap::Arg`] for `--no-latency-correction`.
-fn arg_no_latency_correction() -> clap::Arg {
-    const SHORT: &str = "Disables latency correction.";
-    const LONG: &str = "\
-Disables latency correction that accounts for coordinated omission.
-
 When latency correction is enabled, the latency that is recorded for each
 request is calculated from when the request was scheduled to be sent, rather
 than when it was actually sent. This helps to account for the phenomenon
 known as \"Coordinated Omission\". Latency correction is enabled by defeault.
 ";
 
-    clap::Arg::new("no-latency-correction")
-        .long("no-latency-correction")
-        .action(ArgAction::SetTrue)
-        .help(SHORT)
-        .long_help(LONG)
-}
-
-/// Returns the [`clap::Arg`] for `--stop-on-client-error`.
-fn arg_stop_on_client_error() -> clap::Arg {
-    const SHORT: &str = "Whether to stop if on error.";
-    const LONG: &str = "\
-Sets whether the profiling operation should stop if the client encounters an
-error when sending requests to the target(s). This setting only affects *client-
-side* errors (e.g. too many open files) and not HTTP error statuses returned by
-the target(s).
-
-See --stop-on-http-non-2xx for setting HTTP status stopping behaviour.
-";
-
-    clap::Arg::new("stop-on-client-error")
-        .long("stop-on-client-error")
-        .action(ArgAction::SetTrue)
-        .help(SHORT)
-        .long_help(LONG)
-}
-
-/// Returns the [`clap::Arg`] for `--stop-on-non-2xx`.
-fn arg_stop_on_non_2xx() -> clap::Arg {
-    const SHORT: &str = "Whether to stop on non-2XX HTTP status.";
-    const LONG: &str = "\
-Sets whether the profiling operation should stop if a non-2XX HTTP status is
-retured.
-
-See --stop-on-client-error for setting error stopping behaviour.
-";
-
-    clap::Arg::new("stop-on-non-2xx")
-        .long("stop-on-non-2xx")
-        .action(ArgAction::SetTrue)
-        .help(SHORT)
-        .long_help(LONG)
-}
-
-// TODO: Reorganize args at both global level (e.g. this should prob be one) and across
-// this file and server.rs as there's a bit of repetition.
-/// Returns the [`clap::Arg`] for `--log-level`.
-fn arg_log_level() -> clap::Arg {
-    const SHORT: &str = "Minimum logging level.";
-    const LONG: &str = "\
-Sets the minimum logging level. Log messages at or above the specified
-severity level will be printed.
-";
-
-    clap::Arg::new("log-level")
-        .long("log-level")
-        .value_name("LEVEL")
-        .default_value("off")
-        .value_parser(value_parser!(LogLevel))
+    clap::Arg::new("latency-correction")
+        .long("latency-correction")
+        .value_name("BOOL")
+        .default_value("true")
         .help(SHORT)
         .long_help(LONG)
 }

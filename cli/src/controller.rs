@@ -1,25 +1,25 @@
 use clap::{value_parser, ArgAction};
-use metron::core::AgentConfig;
+use metron::core::ControllerConfig;
 
-use crate::{parser, CLAP_EXPECT};
+use crate::parser;
 
-/// Create the [`clap::Command`] for the `agent` subcommand.
+/// Creates the [`clap::Command`] for the `control` subcommand.
 ///
 /// # Examples
 /// ```bash
-/// # Run Metron as a gRPC agent listening on port 9090.
-/// metron agent --port 9090
+/// # Run Metron as a gRPC controller listening on port 9191 and controlling
+/// # an agent running at localhost:9090.
+/// metron control --port 9191 --agent localhost:9090
 /// ```
 pub(crate) fn command() -> clap::Command {
-    const SHORT: &str = "Run Metron as a distributed agent instance.";
+    const SHORT: &str = "Run Metron as an agent controller.";
     const LONG: &str = "\
-Run Metron as a gRPC agent that listens for instructions from a controller.
-Typically, agents are deployed in a pool and managed by a central controller.
-The controller can be Metron running as a CLI tool (e.g. on a laptop) or
-running as a distributed controller instance (e.g. as a Kubernetes pod).
+Run Metron as a gRPC server that controls a pool of agent instances. The gRPC
+controller implements the same protobuf contract as the agent which allows
+agents and controllers to be composed freely.
 ";
 
-    clap::Command::new("agent")
+    clap::Command::new("controller")
         .about(SHORT)
         .long_about(LONG)
         .args(all_args())
@@ -27,30 +27,28 @@ running as a distributed controller instance (e.g. as a Kubernetes pod).
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<AgentConfig, clap::Error> {
-    let mut config = matches
-        .get_one::<AgentConfig>("config-file")
+pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<ControllerConfig, clap::Error> {
+    let config = matches
+        .get_one::<ControllerConfig>("config-file")
         .cloned()
         .unwrap_or_default();
-
-    config.port = *matches.get_one("port").expect(CLAP_EXPECT);
 
     Ok(config)
 }
 
-/// Return all [`clap::Arg`]s for the `agent` subcommand.
+/// Returns all [`clap::Arg`]s for the `control` subcommand.
 fn all_args() -> Vec<clap::Arg> {
     vec![arg_config_file(), arg_print_config(), arg_port()]
 }
 
-/// Return the [`clap::ArgGroup`]s for the `agent` subcommand.
+/// Returns the [`clap::ArgGroup`]s for the `control` subcommand.
 fn all_arg_groups() -> Vec<clap::ArgGroup> {
     vec![]
 }
 
 /// Returns the [`clap::Arg`] for `--config-file`.
 fn arg_config_file() -> clap::Arg {
-    const SHORT: &str = "Agent configuration file.";
+    const SHORT: &str = "Controller configuration file.";
     const LONG: &str = "\
 A configuration file to be used as an alternative to individual command line
 arguments. Stdin can also be used by specifying hyphen as the file name (i.e.
@@ -66,14 +64,14 @@ See --print-config for bootstrapping a configuration file.
     clap::Arg::new("config-file")
         .long("config-file")
         .value_name("FILE")
-        .value_parser(parser::config_file::<AgentConfig>)
+        .value_parser(parser::config_file::<ControllerConfig>)
         .help(SHORT)
         .long_help(LONG)
 }
 
 /// Returns the [`clap::Arg`] for `--print-config`.
 fn arg_print_config() -> clap::Arg {
-    const SHORT: &str = "Print the agent configuration.";
+    const SHORT: &str = "Print the controller configuration.";
     const LONG: &str = "\
 Generates the configuration for this command and prints it to stdout. This may
 be used to bootstrap a configuration file based on command line arguments so
@@ -88,11 +86,11 @@ arguments.
         .long_help(LONG)
 }
 
-/// Return the [`clap::Arg`] for `--port`.
+/// Returns the [`clap::Arg`] for `--port`.
 fn arg_port() -> clap::Arg {
     const SHORT: &str = "Agent gRPC port to listen on.";
     const LONG: &str = "\
-Set the agent's gRPC port to PORT. Defaults to 9090.
+Sets the agent's gRPC port to PORT. Defaults to 9090.
 ";
 
     clap::Arg::new("port")

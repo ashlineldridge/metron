@@ -1,8 +1,9 @@
-use std::time::Duration;
+use std::{fs::File, io, time::Duration};
 
 use anyhow::{bail, Result};
 use either::Either;
 use metron::core::{Header, Rate};
+use serde::de::DeserializeOwned;
 use url::Url;
 use Either::{Left, Right};
 
@@ -56,4 +57,19 @@ pub fn header(value: &str) -> Result<Header> {
     } else {
         bail!("Headers must be specified in 'K:V' format");
     }
+}
+
+/// Config file clap [`Arg::value_parser`][clap::Arg::value_parser].
+pub fn config_file<T>(value: &str) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    let config = if value == "-" {
+        serde_yaml::from_reader(io::stdin())?
+    } else {
+        let file = File::open(value)?;
+        serde_yaml::from_reader(file)?
+    };
+
+    Ok(config)
 }
