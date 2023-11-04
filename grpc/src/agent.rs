@@ -2,18 +2,39 @@ mod proto {
     tonic::include_proto!("proto");
 }
 
-use metron::core::Plan;
-use proto::{
-    agent_server, AgentStateRequest, AgentStateResponse, LoadTestRequest, LoadTestResponse,
+use std::{
+    future::Future,
+    pin::Pin,
+    task::Poll,
+    time::{Duration, Instant},
 };
-use tonic::{Request, Response, Status};
 
-pub struct GrpcServerAgent<S> {
+use proto::{agent_server, AgentRequest, AgentResponse, Plan};
+use thiserror::Error;
+use tokio_stream::{Stream, StreamExt};
+use tonic::{Request, Response, Streaming};
+use tower::Service;
+
+use self::proto::agent_client;
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error(transparent)]
+    TransportError(#[from] tonic::transport::Error),
+
+    #[error(transparent)]
+    StatusError(#[from] tonic::Status),
+
+    #[error(transparent)]
+    Unexpected(#[from] anyhow::Error),
+}
+
+pub struct AgentServer<S> {
     inner: S,
     port: u16,
 }
 
-impl<S> GrpcServerAgent<S> {
+impl<S> AgentServer<S> {
     pub fn new(inner: S, port: u16) -> Self {
         Self { inner, port }
     }
@@ -33,31 +54,99 @@ impl<S> GrpcServerAgent<S> {
 }
 
 #[tonic::async_trait]
-impl<S> agent_server::Agent for GrpcServerAgent<S>
+impl<S> agent_server::Agent for AgentServer<S>
 where
-    S: tower::Service<Plan> + Send + Sync + 'static,
+    S: Service<Plan> + Send + Sync + 'static,
 {
-    async fn run_load_test(
-        &self,
-        request: Request<LoadTestRequest>,
-    ) -> Result<Response<LoadTestResponse>, Status> {
-        // TODO: Convert LoadTestRequest into a core::LoadTest.
-        // Can we define an Into?
-        // let load_test = core::LoadTest {};
-        // TODO: Look
-        // self.inner.call(load_test);
+    type RunStream =
+        Pin<Box<dyn Stream<Item = Result<AgentResponse, tonic::Status>> + Send + 'static>>;
 
-        let res = LoadTestResponse {};
-        Ok(Response::new(res))
-    }
-
-    async fn get_agent_state(
+    async fn run(
         &self,
-        request: Request<AgentStateRequest>,
-    ) -> Result<Response<AgentStateResponse>, Status> {
-        todo!()
+        request: Request<Streaming<AgentRequest>>,
+    ) -> Result<Response<Self::RunStream>, tonic::Status> {
+        let mut stream = request.into_inner();
+
+        let output = async_stream::try_stream! {
+            while let Some(req) = stream.next().await {
+                // Just bounce responses back for now.
+                let req = req?;
+                let plan = req.plan.ok_or_else(|| tonic::Status::invalid_argument("missing plan"))?;
+                let num_segments = plan.segments.len() as u64;
+                yield AgentResponse { num_segments };
+            }
+        };
+
+        Ok(Response::new(Box::pin(output) as Self::RunStream))
     }
 }
+
+#[derive(Clone)]
+pub struct AgentClient {
+    inner: agent_client::AgentClient<tonic::transport::Channel>,
+}
+
+impl AgentClient {
+    // TODO: This module prob needs its own error type?
+    pub async fn connect(server_addr: String) -> Result<Self, Error> {
+        let inner = agent_client::AgentClient::connect(server_addr).await?;
+
+        Ok(Self { inner })
+    }
+}
+
+impl AgentClient {
+    async fn run(&mut self, plan: &Plan) -> Result<(), Error> {
+        let outbound = async_stream::stream! {
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
+
+            let start = Instant::now();
+            loop {
+                let time = interval.tick().await;
+                let elapsed = time.duration_since(start.into());
+                let request = AgentRequest {
+                    plan: Some(Plan {
+                        segments: vec![],
+                        target: format!("http://foo-{}", elapsed.as_secs()).to_owned(),
+                    }),
+                };
+
+                yield request;
+            }
+        };
+
+        // TODO: Remove unwraps.
+        let response = self.inner.run(Request::new(outbound)).await?;
+        let mut inbound = response.into_inner();
+
+        while let Some(res) = inbound.message().await? {
+            println!("GOT AGENT RESPONSE = {:?}", res);
+        }
+
+        Ok(())
+    }
+}
+
+impl Service<Plan> for AgentClient {
+    type Response = ();
+    type Error = Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    fn poll_ready(
+        &mut self,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: Plan) -> Self::Future {
+        let mut agent = self.clone();
+        Box::pin(async move { agent.run(&req).await })
+    }
+}
+
+// TODO: Make AgentClient a Service and feed it into the Controller to make
+// the Controller be able to talk to remote agents.
 
 // TODO: GrpcServerAgent is also a Service
 

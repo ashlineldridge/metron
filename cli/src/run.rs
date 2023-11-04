@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use clap::{value_parser, ArgAction};
 use either::Either::{Left, Right};
-use metron::core::{PlanSegment, RunnerConfig};
+use metron::core::{HttpMethod, PlanSegment, RunnerConfig};
 use url::Url;
 
 use crate::{
@@ -80,25 +80,25 @@ pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<RunnerConfig, cla
             }
         };
 
-        config.segments.push(segment);
+        config.plan.segments.push(segment);
     }
 
-    config.connections = *matches.get_one::<u64>("connections").expect(CLAP_EXPECT) as usize;
-    config.http_method = *matches.get_one("http-method").expect(CLAP_EXPECT);
-    config.targets = matches
+    config.plan.connections = *matches.get_one::<u64>("connections").expect(CLAP_EXPECT) as usize;
+    config.plan.http_method = *matches.get_one("http-method").expect(CLAP_EXPECT);
+    config.plan.targets = matches
         .get_many::<Url>("target")
         .expect(CLAP_EXPECT)
         .cloned()
         .collect::<Vec<_>>();
 
-    config.headers = matches
+    config.plan.headers = matches
         .get_many("header")
         .unwrap_or_default()
         .cloned()
         .collect();
 
-    config.payload = matches.get_one::<String>("payload").cloned();
-    config.latency_correction = *matches.get_one("latency-correction").expect(CLAP_EXPECT);
+    config.plan.payload = matches.get_one::<String>("payload").cloned();
+    config.plan.latency_correction = *matches.get_one("latency-correction").expect(CLAP_EXPECT);
 
     Ok(config)
 }
@@ -283,7 +283,7 @@ and a payload is specified then HTTP POST will be assumed.
         .long("http-method")
         .value_name("METHOD")
         .default_value("get")
-        // .value_parser(value_parser!(HttpMethod))
+        .value_parser(value_parser!(HttpMethod))
         .help(SHORT)
         .long_help(LONG)
 }
@@ -381,6 +381,7 @@ known as \"Coordinated Omission\". Latency correction is enabled by defeault.
         .long("latency-correction")
         .value_name("BOOL")
         .default_value("true")
+        .value_parser(value_parser!(bool))
         .help(SHORT)
         .long_help(LONG)
 }

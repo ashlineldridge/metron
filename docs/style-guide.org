@@ -2,10 +2,6 @@
 
 This is a simple coding style guide for the Metron codebase. Where practical, style should be enforced via the project's [[file:~/dev/home/metron/rustfmt.toml][rustfmt.toml]] file. This document aims to provide useful advice for higher-level style concerns that can't be enforced by =rustfmt=.
 
-TODO: How are you going to check that either --config-file or --rate is specified (for example)?
-TODO: What about if some value inside the config file is missing?
-TODO: Grrr...
-
 ** Code Comments
 *** Function Comments
 Short comments should be worded in the imperative mood. For example, the following is correct:
@@ -21,9 +17,15 @@ While the following should be avoided:
   /// Finds the `Thing` with ID `id`.
   fn find_thing(&self, id: &str) -> Option<Thing> { todo!() }
 #+end_src
+** Type and Implementation Ordering
+Group structs, enums, etc with their impl blocks.
 
 ** Scratch
 #+begin_src rust
+  // TODO: How are you going to check that either --config-file or --rate is specified (for example)?
+  // TODO: What about if some value inside the config file is missing?
+  // TODO: Grrr...
+
   // TODO:
   // Call the profiler "runner" and pare everything back -
   // get the language right in terms of packages, types, etc.

@@ -5,11 +5,18 @@ import "google/protobuf/duration.proto";
 package proto;
 
 service Agent {
-  rpc RunLoadTest (LoadTestRequest) returns (LoadTestResponse);
-  rpc GetAgentState (AgentStateRequest) returns (AgentStateResponse);
+  rpc Run(stream AgentRequest) returns (stream AgentResponse);
 }
 
-message LoadTestRequest {
+message AgentRequest {
+  Plan plan = 1;
+}
+
+message AgentResponse {
+  uint64 num_segments = 1;
+}
+
+message Plan {
   repeated Segment segments = 1;
   string target = 2;
 }
@@ -31,9 +38,3 @@ message LinearRateSegment {
   float rate_end = 2;
   google.protobuf.Duration total_duration = 3;
 }
-
-message LoadTestResponse {}
-
-message AgentStateRequest {}
-
-message AgentStateResponse {}

@@ -4,17 +4,44 @@ use std::env;
 
 use anyhow::Result;
 use cli::Spec;
+use metron::core::{Agent, AgentConfig, Controller, ControllerConfig, Runner, RunnerConfig};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let spec = cli::parse(env::args_os())?;
     match spec {
-        Spec::Agent(config) => println!("agent: {:?}", config),
-        Spec::Controller(config) => println!("controller: {:?}", config),
-        Spec::Run(config) => println!("run: {:?}", config),
+        Spec::Run(config) => run_runner(config).await?,
+        Spec::Agent(config) => run_agent(config).await?,
+        Spec::Controller(config) => run_controller(config).await?,
         Spec::Help(message) => println!("{message}"),
     }
 
+    Ok(())
+}
+
+async fn run_runner(config: RunnerConfig) -> Result<()> {
+    // TODO: Need to grab the agents/agent-discovery from somewhere.
+    // Perhaps rather than giving the Controller a list of agents,
+    // I give it a mechanism to obtain the agents. In the simple case,
+    // it's a static list. But it also provides a means for agent discovery.
+    let agent_config = AgentConfig::default();
+    let agents = vec![Agent::new(agent_config, Runner::new(config.clone()))];
+    let controller_config = ControllerConfig::default();
+    let controller = Controller::new(controller_config, agents);
+
+    controller.run(&config.plan).await?;
+
+    Ok(())
+}
+
+async fn run_agent(config: AgentConfig) -> Result<()> {
+    // let agent = Agent::new(config, Runner::new(config.clone()));
+    Ok(())
+}
+
+async fn run_controller(config: ControllerConfig) -> Result<()> {
+    // let controller = Controller::n
+    // let agent = Agent::new(config, Runner::new(config.clone()));
     Ok(())
 }
 

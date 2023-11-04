@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use url::Url;
 
-use crate::core::{Header, HttpMethod, Plan, PlanSegment};
+use crate::core::Plan;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -12,17 +11,20 @@ pub enum Error {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Config {
-    // TODO: Should this be wrapped up in a plan?
-    pub segments: Vec<PlanSegment>,
-    pub connections: usize,
-    pub http_method: HttpMethod,
-    pub targets: Vec<Url>,
-    pub headers: Vec<Header>,
-    pub payload: Option<String>,
-    pub worker_threads: usize,
-    pub latency_correction: bool,
+    // TODO: I don't feel like this belongs here...
+    // See how it plays out when we wire up the gRPC scenarios.
+    pub plan: Plan,
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            plan: Default::default(),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Runner {
     config: Config,
 }
@@ -32,22 +34,9 @@ impl Runner {
         Self { config }
     }
 
-    pub async fn run(plan: Plan) -> Result<(), Error> {
-        todo!()
-    }
-}
+    pub async fn run(&self, plan: &Plan) -> Result<(), Error> {
+        println!("Plan: {:?}", plan);
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            segments: vec![],
-            connections: 1,
-            http_method: HttpMethod::Get,
-            targets: vec![],
-            headers: vec![],
-            payload: None,
-            worker_threads: 0,
-            latency_correction: true,
-        }
+        Ok(())
     }
 }

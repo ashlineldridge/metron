@@ -26,9 +26,9 @@ pub enum Error {
 
 #[derive(Clone, Debug)]
 pub enum Spec {
+    Run(RunnerConfig),
     Agent(AgentConfig),
     Controller(ControllerConfig),
-    Run(RunnerConfig),
     Help(String),
 }
 
