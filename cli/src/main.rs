@@ -4,6 +4,7 @@ use std::env;
 
 use anyhow::Result;
 use cli::Spec;
+use grpc::{MetronClient, MetronServer};
 use metron::core::{Agent, AgentConfig, Controller, ControllerConfig, Runner, RunnerConfig};
 
 #[tokio::main]
@@ -34,14 +35,27 @@ async fn run_runner(config: RunnerConfig) -> Result<()> {
     Ok(())
 }
 
+// TODO: See, here the AgentConfig is being given to Agent but port is actually
+// required by AgentServer...
 async fn run_agent(config: AgentConfig) -> Result<()> {
-    // let agent = Agent::new(config, Runner::new(config.clone()));
+    let runner_config = RunnerConfig::default();
+    let agent = Agent::new(config.clone(), Runner::new(runner_config));
+    let metron_server = MetronServer::new(agent, config.port);
+
+    metron_server.listen().await?;
+
     Ok(())
 }
 
 async fn run_controller(config: ControllerConfig) -> Result<()> {
-    // let controller = Controller::n
-    // let agent = Agent::new(config, Runner::new(config.clone()));
+    let agent_addr = "http://[::1]:9090".to_owned();
+    let metron_client = MetronClient::connect(agent_addr).await?;
+    let agents = vec![metron_client];
+    let controller = Controller::new(config, agents);
+    let metron_server = MetronServer::new(controller, 9191);
+
+    metron_server.listen().await?;
+
     Ok(())
 }
 

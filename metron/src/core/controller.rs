@@ -14,12 +14,14 @@ pub enum Error {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Config {}
+pub struct Config {
+    pub port: u16,
+}
 
 #[allow(clippy::derivable_impls)]
 impl Default for Config {
     fn default() -> Self {
-        Self {}
+        Self { port: 9090 }
     }
 }
 
@@ -62,7 +64,6 @@ where
     S: tower::Service<Plan> + Clone + Send + 'static,
     S::Response: Send + Sync + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
-    // S::Future: Send + 'static,
 {
     type Response = ();
     type Error = Error;

@@ -4,15 +4,15 @@ import "google/protobuf/duration.proto";
 
 package proto;
 
-service Agent {
-  rpc Run(stream AgentRequest) returns (stream AgentResponse);
+service Metron {
+  rpc Run(stream MetronRequest) returns (stream MetronResponse);
 }
 
-message AgentRequest {
+message MetronRequest {
   Plan plan = 1;
 }
 
-message AgentResponse {
+message MetronResponse {
   uint64 num_segments = 1;
 }
 
