@@ -25,10 +25,19 @@ async fn run_runner(config: RunnerConfig) -> Result<()> {
     // Perhaps rather than giving the Controller a list of agents,
     // I give it a mechanism to obtain the agents. In the simple case,
     // it's a static list. But it also provides a means for agent discovery.
-    let agent_config = AgentConfig::default();
-    let agents = vec![Agent::new(agent_config, Runner::new(config.clone()))];
+
+    // Need a conditional on whether to create a MetronClient that is given
+    // the address of a remote agent or a local Agent (both implement Service).
+    let agent_addr = "http://[::1]:9090".to_owned();
+    let metron_client = MetronClient::connect(agent_addr).await?;
+    let agents = vec![metron_client];
     let controller_config = ControllerConfig::default();
     let controller = Controller::new(controller_config, agents);
+
+    // let agent_config = AgentConfig::default();
+    // let agents = vec![Agent::new(agent_config, Runner::new(config.clone()))];
+    // let controller_config = ControllerConfig::default();
+    // let controller = Controller::new(controller_config, agents);
 
     controller.run(&config.plan).await?;
 

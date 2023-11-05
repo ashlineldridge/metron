@@ -2,13 +2,7 @@ mod proto {
     tonic::include_proto!("proto");
 }
 
-use std::{
-    future::Future,
-    net::AddrParseError,
-    pin::Pin,
-    task::Poll,
-    time::{Duration, Instant},
-};
+use std::{future::Future, net::AddrParseError, pin::Pin, task::Poll, time::Duration};
 
 use metron::core::Plan;
 use thiserror::Error;
@@ -31,65 +25,6 @@ pub enum Error {
 }
 
 #[derive(Clone)]
-pub struct MetronServer<S> {
-    inner: S,
-    port: u16,
-}
-
-impl<S> MetronServer<S>
-where
-    S: Service<Plan> + Send + Sync + 'static,
-{
-    pub fn new(inner: S, port: u16) -> Self {
-        Self { inner, port }
-    }
-
-    pub async fn listen(self) -> Result<(), Error> {
-        let address = format!("[::1]:{}", self.port)
-            .parse()
-            .map_err(|e: AddrParseError| Error::Unexpected(e.into()))?;
-
-        let server = proto::metron_server::MetronServer::new(self);
-
-        println!("metron server listening on {}", address);
-        tonic::transport::Server::builder()
-            .add_service(server)
-            .serve(address)
-            .await?;
-
-        Ok(())
-    }
-}
-
-#[tonic::async_trait]
-impl<S> proto::metron_server::Metron for MetronServer<S>
-where
-    S: Service<Plan> + Send + Sync + 'static,
-{
-    type RunStream =
-        Pin<Box<dyn Stream<Item = Result<proto::MetronResponse, tonic::Status>> + Send + 'static>>;
-
-    async fn run(
-        &self,
-        request: Request<Streaming<proto::MetronRequest>>,
-    ) -> Result<Response<Self::RunStream>, tonic::Status> {
-        let mut stream = request.into_inner();
-
-        let output = async_stream::try_stream! {
-            while let Some(req) = stream.next().await {
-                // Just bounce responses back for now.
-                let req = req?;
-                let plan = req.plan.ok_or_else(|| tonic::Status::invalid_argument("missing plan"))?;
-                let num_segments = plan.segments.len() as u64;
-                yield proto::MetronResponse { num_segments };
-            }
-        };
-
-        Ok(Response::new(Box::pin(output) as Self::RunStream))
-    }
-}
-
-#[derive(Clone)]
 pub struct MetronClient {
     inner: metron_client::MetronClient<tonic::transport::Channel>,
 }
@@ -104,17 +39,21 @@ impl MetronClient {
 
 impl MetronClient {
     async fn run(&mut self, plan: &Plan) -> Result<(), Error> {
+        let target = plan
+            .targets
+            .first()
+            .expect("where the target at?")
+            .to_string();
         let outbound = async_stream::stream! {
             let mut interval = tokio::time::interval(Duration::from_secs(1));
 
-            let start = Instant::now();
             loop {
-                let time = interval.tick().await;
-                let elapsed = time.duration_since(start.into());
+                let target = target.clone();
+                interval.tick().await;
                 let request = proto::MetronRequest {
                     plan: Some(proto::Plan {
                         segments: vec![],
-                        target: format!("http://foo-{}", elapsed.as_secs()).to_owned(),
+                        target,
                     }),
                 };
 
@@ -152,100 +91,72 @@ impl Service<Plan> for MetronClient {
     }
 }
 
-// TODO: Make AgentClient a Service and feed it into the Controller to make
-// the Controller be able to talk to remote agents.
+#[derive(Clone)]
+pub struct MetronServer<S> {
+    inner: S,
+    port: u16,
+}
 
-// TODO: GrpcServerAgent is also a Service
+impl<S> MetronServer<S>
+where
+    S: Service<Plan> + Send + Sync + Clone + 'static,
+    S::Future: Send + 'static,
+    S::Error: std::fmt::Debug, // This can be removed once proper error handling is in place
+{
+    pub fn new(inner: S, port: u16) -> Self {
+        Self { inner, port }
+    }
 
-// TODO: GrpcServerAgent potentially doesn't need to be a Service.
-// Have a look at Tonic as it will have preferences around  middlewear
-// already. Important thing is that the GrpcServerAgent wraps a
-// Service.
-/// `Service` implementation that runs a gRPC server.
+    pub async fn listen(self) -> Result<(), Error> {
+        let address = format!("[::1]:{}", self.port)
+            .parse()
+            .map_err(|e: AddrParseError| Error::Unexpected(e.into()))?;
 
-// TODO:
-// Make two simple binaries that exercise the interface below
-// Then adjust the types to take advantage of Service trait and other Tonic stuff
-// See: https://github.com/hyperium/tonic/tree/master/examples/src
+        let server = proto::metron_server::MetronServer::new(self);
 
-// #[async_trait]
-// pub trait Client {
-//     async fn run(&mut self, plan: TestPlan) -> Result<TestReport>;
-// }
+        println!("metron server listening on {}", address);
+        tonic::transport::Server::builder()
+            .add_service(server)
+            .serve(address)
+            .await?;
 
-// pub struct GrpcClient(AgentClient<Channel>);
+        Ok(())
+    }
+}
 
-// impl GrpcClient {
-//     pub async fn connect(server_address: &str) -> Result<Self> {
-//         let client = AgentClient::connect(server_address.to_owned()).await?;
-//         Ok(Self(client))
-//     }
-// }
+#[tonic::async_trait]
+impl<S> proto::metron_server::Metron for MetronServer<S>
+where
+    S: Service<Plan> + Send + Sync + Clone + 'static,
+    S::Future: Send + 'static,
+    S::Error: std::fmt::Debug,
+{
+    type RunStream =
+        Pin<Box<dyn Stream<Item = Result<proto::MetronResponse, tonic::Status>> + Send + 'static>>;
 
-// #[async_trait]
-// impl Client for GrpcClient {
-//     async fn run(&mut self, plan: TestPlan) -> Result<TestReport> {
-//         let request = tonic::Request::new(plan);
-//         let response = self.0.run(request).await?;
-//         let report = response.into_inner();
+    async fn run(
+        &self,
+        request: Request<Streaming<proto::MetronRequest>>,
+    ) -> Result<Response<Self::RunStream>, tonic::Status> {
+        let mut stream = request.into_inner();
 
-//         Ok(report)
-//     }
-// }
+        let output = async_stream::try_stream! {
+            while let Some(req) = stream.next().await {
+                // Just bounce responses back for now.
+                let req = req?;
+                let plan = req.plan.ok_or_else(|| tonic::Status::invalid_argument("missing plan"))?;
 
-// #[async_trait]
-// pub trait Server {
-//     async fn run(&self) -> Result<()>;
-// }
+                let target_url = plan.target.parse().expect("couldn't parse target url");
+                let mut metron_plan = Plan::default();
+                metron_plan.targets = vec![target_url];
 
-// #[derive(Clone)]
-// pub struct GrpcServer {
-//     port: u16,
-// }
+                let mut inner = self.inner.clone();
+                inner.call(metron_plan).await.expect("service call failed");
 
-// impl GrpcServer {
-//     pub fn new(port: u16) -> Self {
-//         Self { port }
-//     }
-// }
+                yield proto::MetronResponse { target: plan.target };
+            }
+        };
 
-// #[async_trait]
-// impl Agent for GrpcServer {
-//     async fn run(
-//         &self,
-//         request: tonic::Request<TestPlan>,
-//     ) -> std::result::Result<tonic::Response<TestReport>, tonic::Status> {
-//         let plan = request.into_inner();
-//         println!("Got plan: {:?}", plan);
-
-//         Ok(tonic::Response::new(TestReport {
-//             target: plan.target,
-//             total_requests: 100,
-//             total_duration: None,
-//             response_latency: vec![],
-//             error_latency: vec![],
-//             request_delay: vec![],
-//         }))
-//     }
-// }
-
-// #[async_trait]
-// impl Server for GrpcServer {
-//     async fn run(&self) -> Result<()> {
-//         let address = format!("[::1]:{}", self.port).parse()?;
-//         let service = metron::agent_server::AgentServer::new(self.clone());
-
-//         tonic::transport::Server::builder()
-//             .add_service(service)
-//             .serve(address)
-//             .await?;
-
-//         Ok(())
-//     }
-// }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {}
+        Ok(Response::new(Box::pin(output) as Self::RunStream))
+    }
 }

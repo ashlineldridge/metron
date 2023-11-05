@@ -13,11 +13,12 @@ message MetronRequest {
 }
 
 message MetronResponse {
-  uint64 num_segments = 1;
+  string target = 1;
 }
 
 message Plan {
   repeated Segment segments = 1;
+  // TODO: Needs to reflect actual plan and support multiple targets, etc.
   string target = 2;
 }
 

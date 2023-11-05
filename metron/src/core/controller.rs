@@ -15,6 +15,8 @@ pub enum Error {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Config {
+    // TODO: This needs to be wrapped up in a common GrpcConfig thing that is used
+    // by ControllerConfig, AgentConfig, etc.
     pub port: u16,
 }
 
