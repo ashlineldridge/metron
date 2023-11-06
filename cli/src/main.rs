@@ -9,9 +9,11 @@ use metron::core::{Agent, AgentConfig, Controller, ControllerConfig, Runner, Run
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    dump_config();
+
     let spec = cli::parse(env::args_os())?;
     match spec {
-        Spec::Run(config) => run_runner(config).await?,
+        Spec::Run(config) => run_local(config).await?,
         Spec::Agent(config) => run_agent(config).await?,
         Spec::Controller(config) => run_controller(config).await?,
         Spec::Help(message) => println!("{message}"),
@@ -20,7 +22,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn run_runner(config: RunnerConfig) -> Result<()> {
+async fn run_local(config: RunnerConfig) -> Result<()> {
     // TODO: Need to grab the agents/agent-discovery from somewhere.
     // Perhaps rather than giving the Controller a list of agents,
     // I give it a mechanism to obtain the agents. In the simple case,
@@ -102,3 +104,41 @@ async fn run_controller(config: ControllerConfig) -> Result<()> {
 //    - Entry point will build a Controller that controls an AgentClient configured to talk to localhost:9191
 //    - Entry point will build a Plan and tell the Controller to run it
 //    - What about "runtime" config (e.g. thread settings, connections, etc)?
+
+fn dump_config() {
+    let plan = metron::core::Plan {
+        segments: vec![
+            metron::core::PlanSegment::Fixed {
+                rate: metron::core::Rate::per_second(100),
+                duration: Some(std::time::Duration::from_secs(120)),
+            },
+            metron::core::PlanSegment::Linear {
+                rate_start: metron::core::Rate::per_second(100),
+                rate_end: metron::core::Rate::per_second(200),
+                duration: std::time::Duration::from_secs(60),
+            },
+        ],
+        connections: 8,
+        http_method: metron::core::HttpMethod::Get,
+        targets: vec![
+            "https://foo.com".parse().unwrap(),
+            "https://bar.com".parse().unwrap(),
+        ],
+        headers: vec![
+            metron::core::Header {
+                name: "X-Metron-Foo".to_owned(),
+                value: "foo".to_owned(),
+            },
+            metron::core::Header {
+                name: "X-Metron-Bar".to_owned(),
+                value: "bar".to_owned(),
+            },
+        ],
+        payload: Some("foobar".to_owned()),
+        worker_threads: 8,
+        latency_correction: true,
+    };
+
+    let plan_text = serde_yaml::to_string(&plan).unwrap();
+    println!("{}", plan_text);
+}

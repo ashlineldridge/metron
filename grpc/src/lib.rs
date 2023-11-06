@@ -50,6 +50,7 @@ impl MetronClient {
             loop {
                 let target = target.clone();
                 interval.tick().await;
+                println!("MetronClient sending plan for {target}");
                 let request = proto::MetronRequest {
                     plan: Some(proto::Plan {
                         segments: vec![],

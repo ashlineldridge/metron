@@ -26,6 +26,8 @@ impl Default for Config {
     }
 }
 
+// Consider renaming Agent -> Runner and pulling the Runner
+// logic into here. It seems like a useless composition at the moment.
 #[derive(Clone)]
 pub struct Agent {
     config: Config,
@@ -38,6 +40,7 @@ impl Agent {
     }
 
     pub async fn run(&self, plan: &Plan) -> Result<(), Error> {
+        println!("agent: running plan for {}", plan.targets.first().unwrap());
         self.runner.run(plan).await.map_err(|e| match e {
             RunnerError::Unexpected(e) => Error::Unexpected(e),
         })

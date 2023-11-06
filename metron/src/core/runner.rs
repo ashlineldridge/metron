@@ -35,8 +35,7 @@ impl Runner {
     }
 
     pub async fn run(&self, plan: &Plan) -> Result<(), Error> {
-        println!("Plan: {:?}", plan);
-
+        println!("runner: running plan for {}", plan.targets.first().unwrap());
         Ok(())
     }
 }

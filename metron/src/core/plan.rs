@@ -50,6 +50,10 @@ pub enum PlanSegment {
 pub struct Rate(u32);
 
 impl Rate {
+    pub fn per_second(value: u32) -> Self {
+        Self(value)
+    }
+
     pub fn as_interval(&self) -> Duration {
         Duration::from_secs(1) / self.0
     }
