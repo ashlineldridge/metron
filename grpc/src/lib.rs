@@ -4,7 +4,7 @@ mod proto {
 
 use std::{future::Future, net::AddrParseError, pin::Pin, task::Poll, time::Duration};
 
-use metron::core::Plan;
+use metron::core::{HttpMethod, Plan};
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Streaming};
@@ -145,19 +145,32 @@ where
             while let Some(req) = stream.next().await {
                 let req = req?;
                 let plan = req.plan.ok_or_else(|| tonic::Status::invalid_argument("missing plan"))?;
+                let plan: Plan = plan.try_into().unwrap();
+                let target = plan.targets.first().unwrap().to_string();
 
-                // let target_url = plan.target.parse().expect("couldn't parse target url");
-                // let mut metron_plan = Plan::default();
-                // metron_plan.targets = vec![target_url];
+                inner.call(plan).await.expect("service call failed");
 
-                // let mut inner = self.inner.clone();
-                // inner.call(metron_plan).await.expect("service call failed");
-                inner.call(Plan::default()).await.unwrap();
-
-                yield proto::MetronResponse { target: plan.target };
+                yield proto::MetronResponse { target };
             }
         };
 
         Ok(Response::new(Box::pin(output) as Self::RunStream))
+    }
+}
+
+impl TryFrom<proto::Plan> for Plan {
+    type Error = anyhow::Error;
+
+    fn try_from(value: proto::Plan) -> Result<Self, Self::Error> {
+        Ok(Self {
+            segments: vec![],
+            connections: 3,
+            http_method: HttpMethod::Get,
+            targets: vec![value.target.parse()?],
+            headers: vec![],
+            payload: None,
+            worker_threads: 100,
+            latency_correction: true,
+        })
     }
 }

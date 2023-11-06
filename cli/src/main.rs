@@ -28,7 +28,7 @@ async fn run_runner(config: RunnerConfig) -> Result<()> {
 
     // Need a conditional on whether to create a MetronClient that is given
     // the address of a remote agent or a local Agent (both implement Service).
-    let agent_addr = "http://[::1]:9090".to_owned();
+    let agent_addr = "http://[::1]:9191".to_owned();
     let metron_client = MetronClient::connect(agent_addr).await?;
     let agents = vec![metron_client];
     let controller_config = ControllerConfig::default();
