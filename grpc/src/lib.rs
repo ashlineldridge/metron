@@ -76,7 +76,7 @@ impl MetronClient {
 impl Service<Plan> for MetronClient {
     type Response = ();
     type Error = Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(
         &mut self,
@@ -100,8 +100,8 @@ pub struct MetronServer<S> {
 impl<S> MetronServer<S>
 where
     S: Service<Plan> + Send + Sync + Clone + 'static,
-    S::Future: Send + 'static,
     S::Error: std::fmt::Debug, // This can be removed once proper error handling is in place
+    S::Future: Send + 'static,
 {
     pub fn new(inner: S, port: u16) -> Self {
         Self { inner, port }
@@ -128,8 +128,8 @@ where
 impl<S> proto::metron_server::Metron for MetronServer<S>
 where
     S: Service<Plan> + Send + Sync + Clone + 'static,
-    S::Future: Send + 'static,
     S::Error: std::fmt::Debug,
+    S::Future: Send + 'static,
 {
     type RunStream =
         Pin<Box<dyn Stream<Item = Result<proto::MetronResponse, tonic::Status>> + Send + 'static>>;
@@ -140,18 +140,19 @@ where
     ) -> Result<Response<Self::RunStream>, tonic::Status> {
         let mut stream = request.into_inner();
 
+        let mut inner = self.inner.clone();
         let output = async_stream::try_stream! {
             while let Some(req) = stream.next().await {
-                // Just bounce responses back for now.
                 let req = req?;
                 let plan = req.plan.ok_or_else(|| tonic::Status::invalid_argument("missing plan"))?;
 
-                let target_url = plan.target.parse().expect("couldn't parse target url");
-                let mut metron_plan = Plan::default();
-                metron_plan.targets = vec![target_url];
+                // let target_url = plan.target.parse().expect("couldn't parse target url");
+                // let mut metron_plan = Plan::default();
+                // metron_plan.targets = vec![target_url];
 
-                let mut inner = self.inner.clone();
-                inner.call(metron_plan).await.expect("service call failed");
+                // let mut inner = self.inner.clone();
+                // inner.call(metron_plan).await.expect("service call failed");
+                inner.call(Plan::default()).await.unwrap();
 
                 yield proto::MetronResponse { target: plan.target };
             }

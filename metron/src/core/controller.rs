@@ -35,10 +35,10 @@ pub struct Controller<S> {
 
 impl<S> Controller<S>
 where
-    S: Service<Plan> + Clone + Send + 'static,
+    S: Service<Plan> + Clone + Send + Sync + 'static,
     S::Response: Send + Sync + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
-    // S::Future: Send + 'static,
+    S::Future: Send + 'static,
 {
     pub fn new(config: Config, agents: Vec<S>) -> Self {
         Self { config, agents }
@@ -56,6 +56,7 @@ where
             .call(plan.clone())
             .await
             .map_err(|e| Error::Unexpected(e.into()))?;
+
         Ok(())
     }
 }
@@ -63,13 +64,14 @@ where
 // For now, the Controller just gives the same plan to all agents.
 impl<S> Service<Plan> for Controller<S>
 where
-    S: tower::Service<Plan> + Clone + Send + 'static,
+    S: Service<Plan> + Clone + Send + Sync + 'static,
     S::Response: Send + Sync + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
+    S::Future: Send + 'static,
 {
     type Response = ();
     type Error = Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(
         &mut self,
