@@ -4,41 +4,27 @@ mod proto {
 
 use std::{future::Future, net::AddrParseError, pin::Pin, task::Poll, time::Duration};
 
-use metron::Plan;
+use metron::LoadTestPlan;
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Streaming};
 use tower::Service;
 
-use self::proto::metron_client;
-
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error(transparent)]
-    TransportError(#[from] tonic::transport::Error),
-
-    #[error(transparent)]
-    StatusError(#[from] tonic::Status),
-
-    #[error(transparent)]
-    Unexpected(#[from] anyhow::Error),
-}
-
 #[derive(Clone)]
 pub struct MetronClient {
-    inner: metron_client::MetronClient<tonic::transport::Channel>,
+    inner: proto::metron_client::MetronClient<tonic::transport::Channel>,
 }
 
 impl MetronClient {
     pub async fn connect(server_addr: String) -> Result<Self, Error> {
-        let inner = metron_client::MetronClient::connect(server_addr).await?;
+        let inner = proto::metron_client::MetronClient::connect(server_addr).await?;
 
         Ok(Self { inner })
     }
 }
 
 impl MetronClient {
-    async fn run(&mut self, plan: &Plan) -> Result<(), Error> {
+    async fn run(&mut self, plan: &LoadTestPlan) -> Result<(), Error> {
         let target = plan
             .targets
             .first()
@@ -74,7 +60,7 @@ impl MetronClient {
     }
 }
 
-impl Service<Plan> for MetronClient {
+impl Service<LoadTestPlan> for MetronClient {
     type Response = ();
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -86,7 +72,7 @@ impl Service<Plan> for MetronClient {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: Plan) -> Self::Future {
+    fn call(&mut self, req: LoadTestPlan) -> Self::Future {
         let mut metron = self.clone();
         Box::pin(async move { metron.run(&req).await })
     }
@@ -100,7 +86,7 @@ pub struct MetronServer<S> {
 
 impl<S> MetronServer<S>
 where
-    S: Service<Plan> + Send + Sync + Clone + 'static,
+    S: Service<LoadTestPlan> + Send + Sync + Clone + 'static,
     S::Error: std::fmt::Debug, // This can be removed once proper error handling is in place
     S::Future: Send + 'static,
 {
@@ -128,7 +114,7 @@ where
 #[tonic::async_trait]
 impl<S> proto::metron_server::Metron for MetronServer<S>
 where
-    S: Service<Plan> + Send + Sync + Clone + 'static,
+    S: Service<LoadTestPlan> + Send + Sync + Clone + 'static,
     S::Error: std::fmt::Debug,
     S::Future: Send + 'static,
 {
@@ -146,7 +132,7 @@ where
             while let Some(req) = stream.next().await {
                 let req = req?;
                 let plan = req.plan.ok_or_else(|| tonic::Status::invalid_argument("missing plan"))?;
-                let plan: Plan = plan.try_into().unwrap();
+                let plan: LoadTestPlan = plan.try_into().unwrap();
                 let target = plan.targets.first().unwrap().to_string();
 
                 inner.call(plan).await.expect("service call failed");
@@ -159,14 +145,28 @@ where
     }
 }
 
-impl TryFrom<proto::Plan> for Plan {
+impl TryFrom<proto::Plan> for LoadTestPlan {
     type Error = anyhow::Error;
 
     fn try_from(value: proto::Plan) -> Result<Self, Self::Error> {
-        let mut plan = Plan::default();
+        let mut plan = LoadTestPlan::default();
         let target = value.target.parse()?;
         plan.targets.push(target);
 
         Ok(plan)
     }
+}
+
+// TODO: Create a separate MetronClientError and a MetronServerError
+// following best practices.
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error(transparent)]
+    TransportError(#[from] tonic::transport::Error),
+
+    #[error(transparent)]
+    StatusError(#[from] tonic::Status),
+
+    #[error(transparent)]
+    Unexpected(#[from] anyhow::Error),
 }

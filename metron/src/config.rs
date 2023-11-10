@@ -3,12 +3,12 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-// --- Driver Configuration ---
+// --- Load Test Configuration ---
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct DriverConfig {
+pub struct LoadTestConfig {
     // Always need a plan
-    pub plan: Plan,
+    pub plan: LoadTestPlan,
     // Always need to know how we produce results
     pub telemetry: TelemetryConfig,
     // Sometimes have external runners
@@ -19,10 +19,10 @@ pub struct DriverConfig {
     pub runtime: Option<RuntimeConfig>,
 }
 
-impl Default for DriverConfig {
+impl Default for LoadTestConfig {
     fn default() -> Self {
         Self {
-            plan: Plan::default(),
+            plan: LoadTestPlan::default(),
             telemetry: TelemetryConfig::default(),
             external_runners: None,
             runtime: Some(RuntimeConfig::default()),
@@ -32,21 +32,11 @@ impl Default for DriverConfig {
 
 // --- Runner Configuration ---
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct RunnerConfig {
-    pub server_port: u16,
+    pub server_port: Option<u16>,
     pub telemetry: TelemetryConfig,
     pub runtime: RuntimeConfig,
-}
-
-impl Default for RunnerConfig {
-    fn default() -> Self {
-        Self {
-            server_port: 9090,
-            telemetry: TelemetryConfig::default(),
-            runtime: RuntimeConfig::default(),
-        }
-    }
 }
 
 // --- Controller Configuration ---
@@ -73,7 +63,7 @@ impl Default for ControllerConfig {
 ///
 /// A [Plan] describes how a load test should be run.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Plan {
+pub struct LoadTestPlan {
     pub segments: Vec<PlanSegment>,
     pub connections: usize,
     pub http_method: HttpMethod,
@@ -83,7 +73,7 @@ pub struct Plan {
     pub latency_correction: bool,
 }
 
-impl Plan {
+impl LoadTestPlan {
     pub fn ticks(&self, start: Instant) -> Ticks {
         Ticks::new(self, start)
     }
@@ -120,7 +110,7 @@ impl Plan {
     }
 }
 
-impl Default for Plan {
+impl Default for LoadTestPlan {
     fn default() -> Self {
         Self {
             segments: vec![],
@@ -166,7 +156,7 @@ impl PlanSegment {
 
 pub struct Ticks<'a> {
     /// The plan.
-    plan: &'a Plan,
+    plan: &'a LoadTestPlan,
     /// Cached plan duration.
     duration: Option<Duration>,
     /// When the plan was started.
@@ -176,7 +166,7 @@ pub struct Ticks<'a> {
 }
 
 impl<'a> Ticks<'a> {
-    pub fn new(plan: &'a Plan, start: Instant) -> Self {
+    pub fn new(plan: &'a LoadTestPlan, start: Instant) -> Self {
         Self {
             plan,
             duration: plan.calculate_duration(),

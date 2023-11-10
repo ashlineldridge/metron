@@ -4,34 +4,33 @@ use anyhow::Context;
 use thiserror::Error;
 use tower::Service;
 
-use crate::{ControllerConfig, Plan};
+use crate::LoadTestPlan;
 
 #[derive(Clone)]
 pub struct Controller<S> {
-    config: ControllerConfig,
-    agents: Vec<S>,
+    runners: Vec<S>,
 }
 
 impl<S> Controller<S>
 where
-    S: Service<Plan> + Clone + Send + Sync + 'static,
+    S: Service<LoadTestPlan> + Clone + Send + Sync + 'static,
     S::Response: Send + Sync + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
 {
-    pub fn new(config: ControllerConfig, agents: Vec<S>) -> Self {
-        Self { config, agents }
+    pub fn new(runners: Vec<S>) -> Self {
+        Self { runners }
     }
 
-    pub async fn run(&self, plan: &Plan) -> Result<(), ControllerError> {
-        // TODO: This needs to call the agents in parallel.
-        let mut agent = self
-            .agents
+    pub async fn run(&self, plan: &LoadTestPlan) -> Result<(), ControllerError> {
+        // TODO: This needs to call the runners in parallel.
+        let mut runner = self
+            .runners
             .first()
             .cloned()
-            .context("at least one agent is required")?;
+            .context("at least one runner is required")?;
 
-        agent
+        runner
             .call(plan.clone())
             .await
             .map_err(|e| ControllerError::Unexpected(e.into()))?;
@@ -40,10 +39,10 @@ where
     }
 }
 
-// For now, the Controller just gives the same plan to all agents.
-impl<S> Service<Plan> for Controller<S>
+// For now, the Controller just gives the same plan to all runners.
+impl<S> Service<LoadTestPlan> for Controller<S>
 where
-    S: Service<Plan> + Clone + Send + Sync + 'static,
+    S: Service<LoadTestPlan> + Clone + Send + Sync + 'static,
     S::Response: Send + Sync + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
@@ -59,7 +58,7 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: Plan) -> Self::Future {
+    fn call(&mut self, req: LoadTestPlan) -> Self::Future {
         let controller = self.clone();
         Box::pin(async move { controller.run(&req).await })
     }

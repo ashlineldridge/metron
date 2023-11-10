@@ -4,21 +4,17 @@ use thiserror::Error;
 use tower::Service;
 use tracing::info;
 
-use crate::{Plan, RunnerConfig};
+use crate::LoadTestPlan;
 
-// Consider renaming Agent -> Runner and pulling the Runner
-// logic into here. It seems like a useless composition at the moment.
-#[derive(Clone)]
-pub struct Runner {
-    config: RunnerConfig,
-}
+#[derive(Clone, Default)]
+pub struct Runner {}
 
 impl Runner {
-    pub fn new(config: RunnerConfig) -> Self {
-        Self { config }
+    pub fn new() -> Self {
+        Self {}
     }
 
-    pub async fn run(&self, plan: &Plan) -> Result<(), RunnerError> {
+    pub async fn run(&self, plan: &LoadTestPlan) -> Result<(), RunnerError> {
         info!(
             "runner is executing the plan against target {}",
             plan.targets.first().unwrap()
@@ -28,7 +24,7 @@ impl Runner {
     }
 }
 
-impl Service<Plan> for Runner {
+impl Service<LoadTestPlan> for Runner {
     type Response = ();
     type Error = RunnerError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -40,7 +36,7 @@ impl Service<Plan> for Runner {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: Plan) -> Self::Future {
+    fn call(&mut self, req: LoadTestPlan) -> Self::Future {
         let agent = self.clone();
         Box::pin(async move { agent.run(&req).await })
     }

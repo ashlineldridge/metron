@@ -2,67 +2,69 @@
 
 use std::env;
 
-use anyhow::Result;
-use cli::Spec;
+use anyhow::{anyhow, Result};
+use cli::ParsedCli;
 use grpc::{MetronClient, MetronServer};
-use metron::{Controller, ControllerConfig, DriverConfig, Runner, RunnerConfig};
+use metron::{Controller, ControllerConfig, LoadTestConfig, Runner, RunnerConfig, RunnerDiscovery};
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let spec = cli::parse(env::args_os())?;
-    match spec {
-        Spec::Test(config) => run_test(config).await?,
-        Spec::Runner(config) => run_runner(config).await?,
-        Spec::Controller(config) => run_controller(config).await?,
-        Spec::Help(message) => println!("{message}"),
+    let parsed_config = cli::parse(env::args_os())?;
+    match parsed_config {
+        ParsedCli::Test(config) => run_test(config).await?,
+        ParsedCli::Runner(config) => run_runner(config).await?,
+        ParsedCli::Controller(config) => run_controller(config).await?,
+        ParsedCli::Help(message) => println!("{message}"),
     }
 
     Ok(())
 }
 
-async fn run_test(config: DriverConfig) -> Result<()> {
-    // TODO: Need to grab the agents/agent-discovery from somewhere.
-    // Perhaps rather than giving the Controller a list of agents,
-    // I give it a mechanism to obtain the agents. In the simple case,
-    // it's a static list. But it also provides a means for agent discovery.
-
-    // Need a conditional on whether to create a MetronClient that is given
-    // the address of a remote agent or a local Agent (both implement Service).
-    let agent_addr = "http://[::1]:9191".to_owned();
-    let metron_client = MetronClient::connect(agent_addr).await?;
-    let agents = vec![metron_client];
-    let controller_config = ControllerConfig::default();
-    let controller = Controller::new(controller_config, agents);
-
-    // let agent_config = AgentConfig::default();
-    // let agents = vec![Agent::new(agent_config, Runner::new(config.clone()))];
-    // let controller_config = ControllerConfig::default();
-    // let controller = Controller::new(controller_config, agents);
-
-    controller.run(&config.plan).await?;
+async fn run_test(config: LoadTestConfig) -> Result<()> {
+    if let Some(runner_discovery) = config.external_runners {
+        let runners = external_runners(&runner_discovery).await?;
+        let controller = Controller::new(runners);
+        controller.run(&config.plan).await?;
+    } else {
+        let controller = Controller::new(vec![Runner::new()]);
+        controller.run(&config.plan).await?;
+    }
 
     Ok(())
 }
 
 async fn run_runner(config: RunnerConfig) -> Result<()> {
-    let agent = Runner::new(config.clone());
-    let metron_server = MetronServer::new(agent, config.server_port);
+    let port = config
+        .server_port
+        .ok_or_else(|| anyhow!("runner is missing port number"))?;
+    let runner = Runner::new();
+    let metron_server = MetronServer::new(runner, port);
 
     metron_server.listen().await?;
 
     Ok(())
 }
 
+// Runner addresses need to be of the form: http://[::1]:9090
 async fn run_controller(config: ControllerConfig) -> Result<()> {
-    let agent_addr = "http://[::1]:9090".to_owned();
-    let metron_client = MetronClient::connect(agent_addr).await?;
-    let agents = vec![metron_client];
-    let controller = Controller::new(config, agents);
-    let metron_server = MetronServer::new(controller, 9191);
+    let port = config.server_port;
+    let runners = external_runners(&config.external_runners).await?;
+    let controller = Controller::new(runners);
+    let metron_server = MetronServer::new(controller, port);
 
     metron_server.listen().await?;
 
     Ok(())
+}
+
+async fn external_runners(config: &RunnerDiscovery) -> Result<Vec<MetronClient>> {
+    let mut runners = Vec::with_capacity(config.static_runners.len());
+    for endpoint in &config.static_runners {
+        let runner = MetronClient::connect(endpoint.clone().into()).await?;
+        runners.push(runner);
+    }
+
+    Ok(runners)
 }
 
 // How CLI influences the composition of Metron components:

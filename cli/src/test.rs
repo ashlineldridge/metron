@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use clap::{value_parser, ArgAction};
 use either::Either::{Left, Right};
-use metron::{DriverConfig, HttpMethod, PlanSegment};
+use metron::{HttpMethod, LoadTestConfig, PlanSegment};
 use url::Url;
 
 use crate::{
@@ -34,9 +34,9 @@ the results to a number of potential backends.
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<DriverConfig, clap::Error> {
+pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<LoadTestConfig, clap::Error> {
     let mut config = matches
-        .get_one::<DriverConfig>("config-file")
+        .get_one::<LoadTestConfig>("config-file")
         .cloned()
         .unwrap_or_default();
 
@@ -148,7 +148,7 @@ See --print-config for bootstrapping a configuration file.
     clap::Arg::new("config-file")
         .long("config-file")
         .value_name("FILE")
-        .value_parser(parser::config_file::<DriverConfig>)
+        .value_parser(parser::config_file::<LoadTestConfig>)
         .help(SHORT)
         .long_help(LONG)
 }
