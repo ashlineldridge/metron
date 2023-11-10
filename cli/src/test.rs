@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use clap::{value_parser, ArgAction};
 use either::Either::{Left, Right};
-use metron::core::{HttpMethod, MetronDriverConfig, PlanSegment};
+use metron::{DriverConfig, HttpMethod, PlanSegment};
 use url::Url;
 
 use crate::{
@@ -20,7 +20,7 @@ use crate::{
 ///   --target https://example.com
 /// ```
 pub fn command() -> clap::Command {
-    const SHORT: &str = "Test a load test.";
+    const SHORT: &str = "Run a load test.";
     const LONG: &str = "\
 This command is used to run a load test according to a test plan and stream
 the results to a number of potential backends.
@@ -34,9 +34,9 @@ the results to a number of potential backends.
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<MetronDriverConfig, clap::Error> {
+pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<DriverConfig, clap::Error> {
     let mut config = matches
-        .get_one::<MetronDriverConfig>("config-file")
+        .get_one::<DriverConfig>("config-file")
         .cloned()
         .unwrap_or_default();
 
@@ -148,7 +148,7 @@ See --print-config for bootstrapping a configuration file.
     clap::Arg::new("config-file")
         .long("config-file")
         .value_name("FILE")
-        .value_parser(parser::config_file::<MetronDriverConfig>)
+        .value_parser(parser::config_file::<DriverConfig>)
         .help(SHORT)
         .long_help(LONG)
 }

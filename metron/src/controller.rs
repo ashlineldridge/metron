@@ -1,15 +1,14 @@
 use std::{future::Future, pin::Pin, task::Poll};
 
 use anyhow::Context;
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tower::Service;
 
-use crate::{MetronControllerConfig, Plan};
+use crate::{ControllerConfig, Plan};
 
 #[derive(Clone)]
 pub struct Controller<S> {
-    config: MetronControllerConfig,
+    config: ControllerConfig,
     agents: Vec<S>,
 }
 
@@ -20,7 +19,7 @@ where
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
 {
-    pub fn new(config: MetronControllerConfig, agents: Vec<S>) -> Self {
+    pub fn new(config: ControllerConfig, agents: Vec<S>) -> Self {
         Self { config, agents }
     }
 

@@ -9,7 +9,7 @@ mod test;
 use std::ffi::OsString;
 
 use clap::error::ErrorKind;
-use metron::core::{MetronControllerConfig, MetronDriverConfig, MetronRunnerConfig};
+use metron::{ControllerConfig, DriverConfig, RunnerConfig};
 pub use root::command;
 use thiserror::Error;
 
@@ -42,9 +42,9 @@ where
 
 #[derive(Clone, Debug)]
 pub enum Spec {
-    Test(MetronDriverConfig),
-    Runner(MetronRunnerConfig),
-    Controller(MetronControllerConfig),
+    Test(DriverConfig),
+    Runner(RunnerConfig),
+    Controller(ControllerConfig),
     Help(String),
 }
 

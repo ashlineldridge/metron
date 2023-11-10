@@ -2,7 +2,7 @@ use std::{fs::File, io, time::Duration};
 
 use anyhow::{bail, Result};
 use either::Either;
-use metron::core::{Header, Rate};
+use metron::{Header, Rate};
 use serde::de::DeserializeOwned;
 use url::Url;
 use Either::{Left, Right};

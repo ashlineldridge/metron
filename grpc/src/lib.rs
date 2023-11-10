@@ -4,7 +4,7 @@ mod proto {
 
 use std::{future::Future, net::AddrParseError, pin::Pin, task::Poll, time::Duration};
 
-use metron::core::{HttpMethod, Plan};
+use metron::Plan;
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Streaming};
@@ -163,15 +163,10 @@ impl TryFrom<proto::Plan> for Plan {
     type Error = anyhow::Error;
 
     fn try_from(value: proto::Plan) -> Result<Self, Self::Error> {
-        Ok(Self {
-            segments: vec![],
-            connections: 3,
-            http_method: HttpMethod::Get,
-            targets: vec![value.target.parse()?],
-            headers: vec![],
-            payload: None,
-            worker_threads: 100,
-            latency_correction: true,
-        })
+        let mut plan = Plan::default();
+        let target = value.target.parse()?;
+        plan.targets.push(target);
+
+        Ok(plan)
     }
 }

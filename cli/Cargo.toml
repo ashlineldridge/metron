@@ -4,9 +4,9 @@ version = "0.1.0"
 authors = ["Ashlin Eldridge <ashlin.eldridge@gmail.com>"]
 edition = "2021"
 
-[[bin]]
-name = "metron"
-path = "src/main.rs"
+# [[bin]]
+# name = "metron"
+# path = "src/main.rs"
 
 [dependencies]
 anyhow = "1.0.75"

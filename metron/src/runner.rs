@@ -1,21 +1,20 @@
 use std::{future::Future, pin::Pin, task::Poll};
 
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tower::Service;
 use tracing::info;
 
-use crate::core::Plan;
+use crate::{Plan, RunnerConfig};
 
 // Consider renaming Agent -> Runner and pulling the Runner
 // logic into here. It seems like a useless composition at the moment.
 #[derive(Clone)]
 pub struct Runner {
-    config: MetronRunnerConfig,
+    config: RunnerConfig,
 }
 
 impl Runner {
-    pub fn new(config: MetronRunnerConfig) -> Self {
+    pub fn new(config: RunnerConfig) -> Self {
         Self { config }
     }
 
@@ -44,19 +43,6 @@ impl Service<Plan> for Runner {
     fn call(&mut self, req: Plan) -> Self::Future {
         let agent = self.clone();
         Box::pin(async move { agent.run(&req).await })
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct MetronRunnerConfig {
-    pub port: u16,
-}
-
-impl Default for MetronRunnerConfig {
-    fn default() -> Self {
-        // TODO***: How to share defaults between cli and core? IMO, ideally, core should
-        // define the defaults since it's "business logic".
-        Self { port: 9090 }
     }
 }
 
