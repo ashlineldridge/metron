@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use clap::{value_parser, ArgAction};
 use either::Either::{Left, Right};
-use metron::core::{HttpMethod, PlanSegment, RunnerConfig};
+use metron::core::{HttpMethod, MetronDriverConfig, PlanSegment};
 use url::Url;
 
 use crate::{
@@ -10,23 +10,23 @@ use crate::{
     CLAP_EXPECT,
 };
 
-/// Creates the [`clap::Command`] for the `run` subcommand.
+/// Creates the [`clap::Command`] for the `test` subcommand.
 ///
 /// # Examples
 /// ```bash
-/// metron run \
+/// metron test \
 ///   --rate 100 \
 ///   --duration 20s \
 ///   --target https://example.com
 /// ```
 pub fn command() -> clap::Command {
-    const SHORT: &str = "Run a load test.";
+    const SHORT: &str = "Test a load test.";
     const LONG: &str = "\
 This command is used to run a load test according to a test plan and stream
 the results to a number of potential backends.
 ";
 
-    clap::Command::new("run")
+    clap::Command::new("test")
         .about(SHORT)
         .long_about(LONG)
         .args(all_args())
@@ -34,9 +34,9 @@ the results to a number of potential backends.
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<RunnerConfig, clap::Error> {
+pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<MetronDriverConfig, clap::Error> {
     let mut config = matches
-        .get_one::<RunnerConfig>("config-file")
+        .get_one::<MetronDriverConfig>("config-file")
         .cloned()
         .unwrap_or_default();
 
@@ -132,7 +132,7 @@ fn arg_group_thread_model() -> clap::ArgGroup {
 
 /// Returns the [`clap::Arg`] for `--config-file`.
 fn arg_config_file() -> clap::Arg {
-    const SHORT: &str = "Run configuration file.";
+    const SHORT: &str = "Test configuration file.";
     const LONG: &str = "\
 A configuration file to be used as an alternative to individual command line
 arguments. Stdin can also be used by specifying hyphen as the file name (i.e.
@@ -148,7 +148,7 @@ See --print-config for bootstrapping a configuration file.
     clap::Arg::new("config-file")
         .long("config-file")
         .value_name("FILE")
-        .value_parser(parser::config_file::<RunnerConfig>)
+        .value_parser(parser::config_file::<MetronDriverConfig>)
         .help(SHORT)
         .long_help(LONG)
 }

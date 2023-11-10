@@ -1,5 +1,5 @@
 use clap::{value_parser, ArgAction};
-use metron::core::ControllerConfig;
+use metron::core::MetronControllerConfig;
 
 use crate::parser;
 
@@ -27,9 +27,11 @@ agents and controllers to be composed freely.
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<ControllerConfig, clap::Error> {
+pub(crate) fn parse_args(
+    matches: &clap::ArgMatches,
+) -> Result<MetronControllerConfig, clap::Error> {
     let config = matches
-        .get_one::<ControllerConfig>("config-file")
+        .get_one::<MetronControllerConfig>("config-file")
         .cloned()
         .unwrap_or_default();
 
@@ -64,7 +66,7 @@ See --print-config for bootstrapping a configuration file.
     clap::Arg::new("config-file")
         .long("config-file")
         .value_name("FILE")
-        .value_parser(parser::config_file::<ControllerConfig>)
+        .value_parser(parser::config_file::<MetronControllerConfig>)
         .help(SHORT)
         .long_help(LONG)
 }

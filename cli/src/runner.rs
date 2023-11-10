@@ -1,5 +1,5 @@
 use clap::{value_parser, ArgAction};
-use metron::core::AgentConfig;
+use metron::core::MetronRunnerConfig;
 
 use crate::{parser, CLAP_EXPECT};
 
@@ -27,9 +27,9 @@ running as a distributed controller instance (e.g. as a Kubernetes pod).
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<AgentConfig, clap::Error> {
+pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<MetronRunnerConfig, clap::Error> {
     let mut config = matches
-        .get_one::<AgentConfig>("config-file")
+        .get_one::<MetronRunnerConfig>("config-file")
         .cloned()
         .unwrap_or_default();
 
@@ -66,7 +66,7 @@ See --print-config for bootstrapping a configuration file.
     clap::Arg::new("config-file")
         .long("config-file")
         .value_name("FILE")
-        .value_parser(parser::config_file::<AgentConfig>)
+        .value_parser(parser::config_file::<MetronRunnerConfig>)
         .help(SHORT)
         .long_help(LONG)
 }

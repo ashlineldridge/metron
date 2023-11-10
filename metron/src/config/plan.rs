@@ -239,37 +239,3 @@ impl<'a> Iterator for Ticks<'a> {
         }
     }
 }
-
-/// Builder used to construct a [Plan].
-///
-/// # Examples
-/// ```
-/// use crate::plan::Builder;
-/// use metron_old::Rate;
-///
-/// // Construct a plan that ramps up throughput from 10 RPS to 500 RPS over
-/// // the first 60 seconds and then maintains 500 RPS for a further 5 minutes.
-/// let plan = Builder::new()
-///   .segments(vec![])
-///   .fixed_rate_block(Rate(500), Duration::from_secs(5 * 60))
-///   .build()
-///   .unwrap();
-/// ```
-pub struct Builder {
-    /// The plan under construction.
-    plan: Plan,
-}
-
-impl Builder {
-    pub fn segments(mut self, segments: &[PlanSegment]) -> Builder {
-        for seg in segments {
-            self.plan.segments.push(seg.clone());
-        }
-
-        self
-    }
-
-    pub fn build(self) -> Plan {
-        self.plan
-    }
-}

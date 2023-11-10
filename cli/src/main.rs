@@ -5,16 +5,20 @@ use std::env;
 use anyhow::Result;
 use cli::Spec;
 use grpc::{MetronClient, MetronServer};
-use metron::core::{Agent, AgentConfig, Controller, ControllerConfig, Runner, RunnerConfig};
+use metron::core::{
+    Controller, MetronControllerConfig, MetronDriverConfig, MetronRunner, MetronRunnerConfig,
+};
+use tracing::error;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    dump_config();
+    test_logging();
+    // dump_config();
 
     let spec = cli::parse(env::args_os())?;
     match spec {
-        Spec::Run(config) => run_local(config).await?,
-        Spec::Agent(config) => run_agent(config).await?,
+        Spec::Test(config) => run_test(config).await?,
+        Spec::Runner(config) => run_runner(config).await?,
         Spec::Controller(config) => run_controller(config).await?,
         Spec::Help(message) => println!("{message}"),
     }
@@ -22,7 +26,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn run_local(config: RunnerConfig) -> Result<()> {
+async fn run_test(config: MetronDriverConfig) -> Result<()> {
     // TODO: Need to grab the agents/agent-discovery from somewhere.
     // Perhaps rather than giving the Controller a list of agents,
     // I give it a mechanism to obtain the agents. In the simple case,
@@ -33,12 +37,12 @@ async fn run_local(config: RunnerConfig) -> Result<()> {
     let agent_addr = "http://[::1]:9191".to_owned();
     let metron_client = MetronClient::connect(agent_addr).await?;
     let agents = vec![metron_client];
-    let controller_config = ControllerConfig::default();
+    let controller_config = MetronControllerConfig::default();
     let controller = Controller::new(controller_config, agents);
 
     // let agent_config = AgentConfig::default();
     // let agents = vec![Agent::new(agent_config, Runner::new(config.clone()))];
-    // let controller_config = ControllerConfig::default();
+    // let controller_config = MetronControllerConfig::default();
     // let controller = Controller::new(controller_config, agents);
 
     controller.run(&config.plan).await?;
@@ -46,11 +50,8 @@ async fn run_local(config: RunnerConfig) -> Result<()> {
     Ok(())
 }
 
-// TODO: See, here the AgentConfig is being given to Agent but port is actually
-// required by AgentServer...
-async fn run_agent(config: AgentConfig) -> Result<()> {
-    let runner_config = RunnerConfig::default();
-    let agent = Agent::new(config.clone(), Runner::new(runner_config));
+async fn run_runner(config: MetronRunnerConfig) -> Result<()> {
+    let agent = MetronRunner::new(config.clone());
     let metron_server = MetronServer::new(agent, config.port);
 
     metron_server.listen().await?;
@@ -58,7 +59,7 @@ async fn run_agent(config: AgentConfig) -> Result<()> {
     Ok(())
 }
 
-async fn run_controller(config: ControllerConfig) -> Result<()> {
+async fn run_controller(config: MetronControllerConfig) -> Result<()> {
     let agent_addr = "http://[::1]:9090".to_owned();
     let metron_client = MetronClient::connect(agent_addr).await?;
     let agents = vec![metron_client];
@@ -141,4 +142,12 @@ fn dump_config() {
 
     let plan_text = serde_yaml::to_string(&plan).unwrap();
     println!("{}", plan_text);
+}
+
+fn test_logging() {
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::TRACE)
+        .init();
+
+    error!("ayo, we got an error here");
 }

@@ -5,31 +5,11 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tower::Service;
 
-use crate::core::Plan;
-
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error(transparent)]
-    Unexpected(#[from] anyhow::Error),
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Config {
-    // TODO: This needs to be wrapped up in a common GrpcConfig thing that is used
-    // by ControllerConfig, AgentConfig, etc.
-    pub port: u16,
-}
-
-#[allow(clippy::derivable_impls)]
-impl Default for Config {
-    fn default() -> Self {
-        Self { port: 9090 }
-    }
-}
+use crate::{MetronControllerConfig, Plan};
 
 #[derive(Clone)]
 pub struct Controller<S> {
-    config: Config,
+    config: MetronControllerConfig,
     agents: Vec<S>,
 }
 
@@ -40,11 +20,11 @@ where
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
 {
-    pub fn new(config: Config, agents: Vec<S>) -> Self {
+    pub fn new(config: MetronControllerConfig, agents: Vec<S>) -> Self {
         Self { config, agents }
     }
 
-    pub async fn run(&self, plan: &Plan) -> Result<(), Error> {
+    pub async fn run(&self, plan: &Plan) -> Result<(), ControllerError> {
         // TODO: This needs to call the agents in parallel.
         let mut agent = self
             .agents
@@ -55,7 +35,7 @@ where
         agent
             .call(plan.clone())
             .await
-            .map_err(|e| Error::Unexpected(e.into()))?;
+            .map_err(|e| ControllerError::Unexpected(e.into()))?;
 
         Ok(())
     }
@@ -70,7 +50,7 @@ where
     S::Future: Send + 'static,
 {
     type Response = ();
-    type Error = Error;
+    type Error = ControllerError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(
@@ -84,4 +64,10 @@ where
         let controller = self.clone();
         Box::pin(async move { controller.run(&req).await })
     }
+}
+
+#[derive(Error, Debug)]
+pub enum ControllerError {
+    #[error(transparent)]
+    Unexpected(#[from] anyhow::Error),
 }

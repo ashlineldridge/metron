@@ -18,7 +18,22 @@ While the following should be avoided:
   fn find_thing(&self, id: &str) -> Option<Thing> { todo!() }
 #+end_src
 ** Type and Implementation Ordering
-Group structs, enums, etc with their impl blocks.
+Group structs, enums, etc with their impl blocks. E.g.:
+#+begin_src rust
+  // Use this:
+  struct A {}
+  impl A {}
+  struct B {}
+  impl B {}
+
+  // Not this:
+  struct A {}
+  struct B {}
+  impl A {}
+  impl B {}
+#+end_src
+** Errors
+Define errors near to their "unit of fallibility" as per [[https://sabrinajewson.org/blog/errors][this article]]. As also mentioned in the article, follow the standard library's example of lower case error messages.
 
 ** Scratch
 #+begin_src rust

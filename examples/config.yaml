@@ -3,6 +3,7 @@
 # MetronRunner
 # MetronServer
 # MetronClient
+# MetronDriver <- the thing that the user is "holding"
 ---
 # Configuration required by run_local.
 # Not required if runners: is specified.
