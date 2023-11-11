@@ -22,7 +22,7 @@ where
     let spec = root::command()
         .try_get_matches_from(it)
         .and_then(|matches| match matches.subcommand() {
-            Some(("test", matches)) => test::parse_args(matches).map(ParsedCli::Test),
+            Some(("test", matches)) => test::parse_args(matches).map(ParsedCli::LoadTest),
             Some(("runner", matches)) => runner::parse_args(matches).map(ParsedCli::Runner),
             Some(("controller", matches)) => {
                 controller::parse_args(matches).map(ParsedCli::Controller)
@@ -43,7 +43,7 @@ where
 
 #[derive(Clone, Debug)]
 pub enum ParsedCli {
-    Test(LoadTestConfig),
+    LoadTest(LoadTestConfig),
     Runner(RunnerConfig),
     Controller(ControllerConfig),
     Help(String),

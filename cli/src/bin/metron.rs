@@ -2,7 +2,7 @@
 
 use std::env;
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use cli::ParsedCli;
 use grpc::{MetronClient, MetronServer};
 use metron::{Controller, ControllerConfig, LoadTestConfig, Runner, RunnerConfig, RunnerDiscovery};
@@ -11,7 +11,7 @@ use metron::{Controller, ControllerConfig, LoadTestConfig, Runner, RunnerConfig,
 async fn main() -> Result<()> {
     let parsed_config = cli::parse(env::args_os())?;
     match parsed_config {
-        ParsedCli::Test(config) => run_test(config).await?,
+        ParsedCli::LoadTest(config) => run_test(config).await?,
         ParsedCli::Runner(config) => run_runner(config).await?,
         ParsedCli::Controller(config) => run_controller(config).await?,
         ParsedCli::Help(message) => println!("{message}"),
@@ -34,9 +34,7 @@ async fn run_test(config: LoadTestConfig) -> Result<()> {
 }
 
 async fn run_runner(config: RunnerConfig) -> Result<()> {
-    let port = config
-        .server_port
-        .ok_or_else(|| anyhow!("runner is missing port number"))?;
+    let port = config.server_port;
     let runner = Runner::new();
     let metron_server = MetronServer::new(runner, port);
 

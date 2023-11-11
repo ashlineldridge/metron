@@ -15,9 +15,10 @@ console-subscriber = "0.2.0"
 either = "1.9.0"
 grpc = { path = "../grpc" }
 humantime = "2.1.0"
+lazy_static = "1.4.0"
 metron = { path = "../metron" }
 serde = { version = "1.0.189", features = ["derive"] }
-serde_yaml = "0.9.25"
+serde_yaml = "0.9.27"
 thiserror = "1.0.50"
 tokio = { version = "1.31.0", features = ["full"] }
 tracing = "0.1.40"

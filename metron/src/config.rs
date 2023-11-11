@@ -1,7 +1,11 @@
+use std::fmt::Debug;
+
 use anyhow::bail;
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use url::Url;
+
+const DEFAULT_GRPC_PORT: u16 = 9090;
 
 // --- Load Test Configuration ---
 
@@ -32,11 +36,21 @@ impl Default for LoadTestConfig {
 
 // --- Runner Configuration ---
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RunnerConfig {
-    pub server_port: Option<u16>,
+    pub server_port: u16,
     pub telemetry: TelemetryConfig,
     pub runtime: RuntimeConfig,
+}
+
+impl Default for RunnerConfig {
+    fn default() -> Self {
+        Self {
+            server_port: DEFAULT_GRPC_PORT,
+            telemetry: Default::default(),
+            runtime: Default::default(),
+        }
+    }
 }
 
 // --- Controller Configuration ---
@@ -44,14 +58,13 @@ pub struct RunnerConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ControllerConfig {
     pub server_port: u16,
-    // Always have external runners
     pub external_runners: RunnerDiscovery,
 }
 
 impl Default for ControllerConfig {
     fn default() -> Self {
         Self {
-            server_port: 9191,
+            server_port: DEFAULT_GRPC_PORT,
             external_runners: RunnerDiscovery::default(),
         }
     }
@@ -313,6 +326,7 @@ pub enum SignallerKind {
 }
 
 use std::{
+    fmt::Display,
     ops::Deref,
     str::FromStr,
     time::{Duration, Instant},
@@ -332,9 +346,9 @@ impl Rate {
     }
 }
 
-impl std::fmt::Debug for Rate {
+impl Debug for Rate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
+        Debug::fmt(&self.0, f)
     }
 }
 
@@ -394,5 +408,16 @@ pub enum HttpMethod {
 impl Default for HttpMethod {
     fn default() -> Self {
         Self::Get
+    }
+}
+
+// This impl is used to provide the default value used by clap. When Metron
+// becomes more protocol agnostic this can go away.
+impl Display for HttpMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = serde_yaml::to_string(self).unwrap();
+        write!(f, "{}", value.trim())?;
+
+        Ok(())
     }
 }

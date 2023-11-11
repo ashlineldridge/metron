@@ -98,8 +98,16 @@ Set the agent's gRPC port to PORT. Defaults to 9090.
     clap::Arg::new("port")
         .long("port")
         .value_name("PORT")
-        .default_value("9090")
+        .default_value(default::PORT.as_str())
         .value_parser(value_parser!(u16))
         .help(SHORT)
         .long_help(LONG)
+}
+
+mod default {
+    use super::*;
+    lazy_static::lazy_static! {
+        static ref CONFIG: RunnerConfig = RunnerConfig::default();
+        pub(super) static ref PORT: String = CONFIG.server_port.to_string();
+    }
 }

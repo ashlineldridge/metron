@@ -282,7 +282,7 @@ and a payload is specified then HTTP POST will be assumed.
     clap::Arg::new("http-method")
         .long("http-method")
         .value_name("METHOD")
-        .default_value("get")
+        .default_value(default::HTTP_METHOD.as_str())
         .value_parser(value_parser!(HttpMethod))
         .help(SHORT)
         .long_help(LONG)
@@ -361,7 +361,7 @@ TODO: Elaborate.
     clap::Arg::new("connections")
         .long("connections")
         .value_name("COUNT")
-        .default_value("1")
+        .default_value(default::CONNECTIONS.as_str())
         .value_parser(value_parser!(u64).range(1..))
         .help(SHORT)
         .long_help(LONG)
@@ -380,8 +380,18 @@ known as \"Coordinated Omission\". Latency correction is enabled by defeault.
     clap::Arg::new("latency-correction")
         .long("latency-correction")
         .value_name("BOOL")
-        .default_value("true")
+        .default_value(default::LATENCY_CORRECTION.as_str())
         .value_parser(value_parser!(bool))
         .help(SHORT)
         .long_help(LONG)
+}
+
+mod default {
+    use super::*;
+    lazy_static::lazy_static! {
+        static ref CONFIG: LoadTestConfig = LoadTestConfig::default();
+        pub(super) static ref HTTP_METHOD: String = CONFIG.plan.http_method.to_string();
+        pub(super) static ref CONNECTIONS: String = CONFIG.plan.connections.to_string();
+        pub(super) static ref LATENCY_CORRECTION: String = CONFIG.plan.latency_correction.to_string();
+    }
 }
