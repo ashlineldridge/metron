@@ -14,7 +14,7 @@ async fn main() -> Result<()> {
         ParsedCli::LoadTest(config) => run_test(config).await?,
         ParsedCli::Runner(config) => run_runner(config).await?,
         ParsedCli::Controller(config) => run_controller(config).await?,
-        ParsedCli::Help(message) => println!("{message}"),
+        ParsedCli::PrintConfig(text) | ParsedCli::Help(text) => println!("{text}"),
     }
 
     Ok(())

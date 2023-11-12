@@ -1,7 +1,8 @@
+use anyhow::anyhow;
 use clap::{value_parser, ArgAction};
 use metron::RunnerConfig;
 
-use crate::{parser, CLAP_EXPECT};
+use crate::{parser, CliError, BAD_CLAP};
 
 /// Create the [`clap::Command`] for the `agent` subcommand.
 ///
@@ -27,13 +28,13 @@ running as a distributed controller instance (e.g. as a Kubernetes pod).
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<RunnerConfig, clap::Error> {
+pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<RunnerConfig, CliError> {
     let mut config = matches
         .get_one::<RunnerConfig>("config-file")
         .cloned()
         .unwrap_or_default();
 
-    config.server_port = *matches.get_one("port").expect(CLAP_EXPECT);
+    config.server_port = *matches.get_one("port").ok_or(anyhow!(BAD_CLAP))?;
 
     Ok(config)
 }

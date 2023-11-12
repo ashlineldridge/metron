@@ -1,7 +1,7 @@
 use clap::{value_parser, ArgAction};
 use metron::ControllerConfig;
 
-use crate::parser;
+use crate::{parser, CliError};
 
 /// Creates the [`clap::Command`] for the `control` subcommand.
 ///
@@ -27,7 +27,7 @@ agents and controllers to be composed freely.
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<ControllerConfig, clap::Error> {
+pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<ControllerConfig, CliError> {
     let config = matches
         .get_one::<ControllerConfig>("config-file")
         .cloned()
