@@ -1,26 +1,19 @@
-use anyhow::anyhow;
 use clap::{value_parser, ArgAction};
 use metron::RunnerConfig;
 
-use crate::{parser, CliError, BAD_CLAP};
+use crate::{parser, InvalidArgsError, BAD_CLAP};
 
-/// Create the [`clap::Command`] for the `agent` subcommand.
-///
-/// # Examples
-/// ```bash
-/// # Run Metron as a gRPC agent listening on port 9090.
-/// metron agent --port 9090
-/// ```
+/// Create the [`clap::Command`] for the `runner` subcommand.
 pub(crate) fn command() -> clap::Command {
-    const SHORT: &str = "Run Metron as a distributed agent instance.";
+    const SHORT: &str = "Start a Metron runner.";
     const LONG: &str = "\
-Run Metron as a gRPC agent that listens for instructions from a controller.
-Typically, agents are deployed in a pool and managed by a central controller.
+Run Metron as a gRPC service that listens for instructions from a controller.
+Typically, runners are deployed in a pool and managed by a central controller.
 The controller can be Metron running as a CLI tool (e.g. on a laptop) or
 running as a distributed controller instance (e.g. as a Kubernetes pod).
 ";
 
-    clap::Command::new("agent")
+    clap::Command::new("runner")
         .about(SHORT)
         .long_about(LONG)
         .args(all_args())
@@ -28,30 +21,30 @@ running as a distributed controller instance (e.g. as a Kubernetes pod).
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<RunnerConfig, CliError> {
+pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<RunnerConfig, InvalidArgsError> {
     let mut config = matches
         .get_one::<RunnerConfig>("config-file")
         .cloned()
         .unwrap_or_default();
 
-    config.server_port = *matches.get_one("port").ok_or(anyhow!(BAD_CLAP))?;
+    config.server_port = *matches.get_one("port").expect(BAD_CLAP);
 
     Ok(config)
 }
 
-/// Return all [`clap::Arg`]s for the `agent` subcommand.
+/// Return all [`clap::Arg`]s for the `runner` subcommand.
 fn all_args() -> Vec<clap::Arg> {
     vec![arg_config_file(), arg_print_config(), arg_port()]
 }
 
-/// Return the [`clap::ArgGroup`]s for the `agent` subcommand.
+/// Return the [`clap::ArgGroup`]s for the `runner` subcommand.
 fn all_arg_groups() -> Vec<clap::ArgGroup> {
     vec![]
 }
 
 /// Returns the [`clap::Arg`] for `--config-file`.
 fn arg_config_file() -> clap::Arg {
-    const SHORT: &str = "Agent configuration file.";
+    const SHORT: &str = "Runner configuration file.";
     const LONG: &str = "\
 A configuration file to be used as an alternative to individual command line
 arguments. Stdin can also be used by specifying hyphen as the file name (i.e.
@@ -74,7 +67,7 @@ See --print-config for bootstrapping a configuration file.
 
 /// Returns the [`clap::Arg`] for `--print-config`.
 fn arg_print_config() -> clap::Arg {
-    const SHORT: &str = "Print the agent configuration.";
+    const SHORT: &str = "Print the runner configuration.";
     const LONG: &str = "\
 Generates the configuration for this command and prints it to stdout. This may
 be used to bootstrap a configuration file based on command line arguments so
@@ -91,9 +84,9 @@ arguments.
 
 /// Return the [`clap::Arg`] for `--port`.
 fn arg_port() -> clap::Arg {
-    const SHORT: &str = "Agent gRPC port to listen on.";
+    const SHORT: &str = "gRPC port to listen on.";
     const LONG: &str = "\
-Set the agent's gRPC port to PORT. Defaults to 9090.
+Set the runner's gRPC port to PORT. Defaults to 9090.
 ";
 
     clap::Arg::new("port")

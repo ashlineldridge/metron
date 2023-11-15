@@ -6,9 +6,8 @@ mod root;
 mod runner;
 mod test;
 
-use std::ffi::OsString;
+use std::{ffi::OsString, fmt::Display};
 
-use anyhow::{anyhow, Context};
 use clap::error::ErrorKind;
 use metron::{ControllerConfig, LoadTestConfig, RunnerConfig};
 use thiserror::Error;
@@ -16,11 +15,13 @@ use thiserror::Error;
 pub(crate) const BAD_CLAP: &str = "clap has been misconfigured";
 pub(crate) const BAD_SERDE: &str = "serde has been misconfigured";
 
-pub fn parse<I, T>(it: I) -> Result<ParsedCli, CliError>
+pub fn parse<I, T>(it: I) -> Result<ParsedCli, InvalidArgsError>
 where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
+    // Extract the matches, handling for the fact that clap returns an error
+    // when the user passes --help / -h or --version / -V.
     let matches = match root::command().try_get_matches_from(it) {
         Ok(m) => m,
         Err(e) => {
@@ -28,48 +29,46 @@ where
             if e.kind() == ErrorKind::DisplayHelp || e.kind() == ErrorKind::DisplayVersion {
                 return Ok(ParsedCli::Help(msg));
             } else {
-                return Err(CliError::Invalid(msg));
+                return Err(InvalidArgsError(msg));
             }
         }
     };
 
-    let result = if let Some((command, matches)) = matches.subcommand() {
-        let print_config = *matches.get_one("print-config").unwrap_or(&false);
-        match command {
-            "test" => {
-                let config = test::parse_args(matches).context(BAD_CLAP)?;
-                if print_config {
-                    let text = serde_yaml::to_string(&config).context(BAD_SERDE)?;
-                    Ok(ParsedCli::PrintConfig(text))
-                } else {
-                    Ok(ParsedCli::LoadTest(config))
-                }
+    let (command, matches) = matches.subcommand().expect(BAD_CLAP);
+    let print_config = *matches.get_one("print-config").unwrap_or(&false);
+
+    let result = match command {
+        "test" => {
+            let config = test::parse_args(matches).expect(BAD_CLAP);
+            if print_config {
+                let text = serde_yaml::to_string(&config).expect(BAD_SERDE);
+                ParsedCli::PrintConfig(text)
+            } else {
+                ParsedCli::LoadTest(config)
             }
-            "runner" => {
-                let config = runner::parse_args(matches).context(BAD_CLAP)?;
-                if print_config {
-                    let text = serde_yaml::to_string(&config).context(BAD_SERDE)?;
-                    Ok(ParsedCli::PrintConfig(text))
-                } else {
-                    Ok(ParsedCli::Runner(config))
-                }
-            }
-            "controller" => {
-                let config = controller::parse_args(matches).context(BAD_CLAP)?;
-                if print_config {
-                    let text = serde_yaml::to_string(&config).context(BAD_SERDE)?;
-                    Ok(ParsedCli::PrintConfig(text))
-                } else {
-                    Ok(ParsedCli::Controller(config))
-                }
-            }
-            _ => Err(CliError::Unexpected(anyhow!(BAD_CLAP))),
         }
-    } else {
-        Err(CliError::Unexpected(anyhow!(BAD_CLAP)))
+        "runner" => {
+            let config = runner::parse_args(matches).expect(BAD_CLAP);
+            if print_config {
+                let text = serde_yaml::to_string(&config).expect(BAD_SERDE);
+                ParsedCli::PrintConfig(text)
+            } else {
+                ParsedCli::Runner(config)
+            }
+        }
+        "controller" => {
+            let config = controller::parse_args(matches).expect(BAD_CLAP);
+            if print_config {
+                let text = serde_yaml::to_string(&config).expect(BAD_SERDE);
+                ParsedCli::PrintConfig(text)
+            } else {
+                ParsedCli::Controller(config)
+            }
+        }
+        _ => panic!("{}", BAD_CLAP),
     };
 
-    result
+    Ok(result)
 }
 
 #[derive(Clone, Debug)]
@@ -82,20 +81,10 @@ pub enum ParsedCli {
 }
 
 #[derive(Error, Debug)]
-pub enum CliError {
-    #[error("{0}")]
-    Invalid(String),
+pub struct InvalidArgsError(String);
 
-    #[error(transparent)]
-    Unexpected(#[from] anyhow::Error),
-}
-
-impl CliError {
-    pub(crate) fn invalid(
-        command: &mut clap::Command,
-        kind: clap::error::ErrorKind,
-        message: &str,
-    ) -> CliError {
-        CliError::Invalid(command.error(kind, message).render().to_string())
+impl Display for InvalidArgsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

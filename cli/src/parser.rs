@@ -1,6 +1,6 @@
 use std::{fs::File, io, time::Duration};
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use either::Either;
 use metron::{Header, Rate};
 use serde::de::DeserializeOwned;
@@ -36,12 +36,12 @@ pub fn target(value: &str) -> Result<Url> {
     let url = value.parse::<url::Url>()?;
 
     if url.cannot_be_a_base() {
-        bail!("Supplied URL cannot be a base URL");
+        bail!("supplied URL cannot be a base URL");
     }
 
     let scheme = url.scheme();
     if scheme != "http" && scheme != "https" {
-        bail!("Only HTTP and HTTPS URL schemes are currently supported");
+        bail!("only HTTP and HTTPS URL schemes are currently supported");
     }
 
     Ok(url)
@@ -55,7 +55,7 @@ pub fn header(value: &str) -> Result<Header> {
             value: v.to_owned(),
         })
     } else {
-        bail!("Headers must be specified in 'K:V' format");
+        bail!("headers must be specified in 'K:V' format");
     }
 }
 
@@ -64,11 +64,22 @@ pub fn config_file<T>(value: &str) -> Result<T>
 where
     T: DeserializeOwned,
 {
+    let config_error = |e: serde_yaml::Error| {
+        if let Some(loc) = e.location() {
+            anyhow!(format!(
+                "unexpected config file content at line {}, index {}",
+                loc.line(),
+                loc.index(),
+            ))
+        } else {
+            anyhow!("unexpected config file")
+        }
+    };
     let config = if value == "-" {
-        serde_yaml::from_reader(io::stdin())?
+        serde_yaml::from_reader(io::stdin()).map_err(config_error)?
     } else {
         let file = File::open(value)?;
-        serde_yaml::from_reader(file)?
+        serde_yaml::from_reader(file).map_err(config_error)?
     };
 
     Ok(config)

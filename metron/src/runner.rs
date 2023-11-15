@@ -37,8 +37,8 @@ impl Service<LoadTestPlan> for Runner {
     }
 
     fn call(&mut self, req: LoadTestPlan) -> Self::Future {
-        let agent = self.clone();
-        Box::pin(async move { agent.run(&req).await })
+        let runner = self.clone();
+        Box::pin(async move { runner.run(&req).await })
     }
 }
 

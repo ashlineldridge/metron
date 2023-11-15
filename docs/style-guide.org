@@ -35,6 +35,8 @@ Group structs, enums, etc with their impl blocks. E.g.:
 ** Errors
 Define errors near to their "unit of fallibility" as per [[https://sabrinajewson.org/blog/errors][this article]]. As also mentioned in the article, follow the standard library's example of lower case error messages.
 
+The program should panic when it has a bug. Use the =Result<V, E>= type to handle the errors encountered by a correct application. However, when the program is incorrect it should panic rather than mask that incorrectness behind a value. See [[https://blog.burntsushi.net/unwrap/][this article]].
+
 ** Scratch
 #+begin_src rust
   // TODO: How are you going to check that either --config-file or --rate is specified (for example)?

@@ -1,22 +1,15 @@
 use clap::{value_parser, ArgAction};
 use metron::ControllerConfig;
 
-use crate::{parser, CliError};
+use crate::{parser, InvalidArgsError};
 
-/// Creates the [`clap::Command`] for the `control` subcommand.
-///
-/// # Examples
-/// ```bash
-/// # Run Metron as a gRPC controller listening on port 9191 and controlling
-/// # an agent running at localhost:9090.
-/// metron control --port 9191 --agent localhost:9090
-/// ```
+/// Creates the [`clap::Command`] for the `controller` subcommand.
 pub(crate) fn command() -> clap::Command {
-    const SHORT: &str = "Run Metron as an agent controller.";
+    const SHORT: &str = "Start a Metron controller.";
     const LONG: &str = "\
-Run Metron as a gRPC server that controls a pool of agent instances. The gRPC
-controller implements the same protobuf contract as the agent which allows
-agents and controllers to be composed freely.
+Run Metron as a gRPC service that controls a pool of runners. Metron
+controllers also implement the runner protobuf contract allowing them
+to be composed.
 ";
 
     clap::Command::new("controller")
@@ -27,7 +20,7 @@ agents and controllers to be composed freely.
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<ControllerConfig, CliError> {
+pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<ControllerConfig, InvalidArgsError> {
     let config = matches
         .get_one::<ControllerConfig>("config-file")
         .cloned()
@@ -88,9 +81,9 @@ arguments.
 
 /// Returns the [`clap::Arg`] for `--port`.
 fn arg_port() -> clap::Arg {
-    const SHORT: &str = "Agent gRPC port to listen on.";
+    const SHORT: &str = "gRPC port to listen on.";
     const LONG: &str = "\
-Sets the agent's gRPC port to PORT. Defaults to 9090.
+Set the controller's gRPC port to PORT. Defaults to 9090.
 ";
 
     clap::Arg::new("port")

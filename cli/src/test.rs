@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use anyhow::anyhow;
 use clap::{error::ErrorKind, value_parser, ArgAction};
 use either::Either::{Left, Right};
 use metron::{HttpMethod, LoadTestConfig, PlanSegment};
@@ -8,7 +7,7 @@ use url::Url;
 
 use crate::{
     parser::{self, RateArgValue},
-    CliError, BAD_CLAP,
+    InvalidArgsError, BAD_CLAP,
 };
 
 /// Creates the [`clap::Command`] for the `test` subcommand.
@@ -35,24 +34,26 @@ the results to a number of potential backends.
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<LoadTestConfig, CliError> {
+pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<LoadTestConfig, InvalidArgsError> {
     let mut config = matches
         .get_one::<LoadTestConfig>("config-file")
         .cloned()
         .unwrap_or_default();
 
-    let rates = matches
-        .get_many::<RateArgValue>("rate")
-        .ok_or(anyhow!(BAD_CLAP))?;
+    let rates = matches.get_many::<RateArgValue>("rate").expect(BAD_CLAP);
     let durations = matches
         .get_many::<Option<Duration>>("duration")
-        .ok_or(anyhow!(BAD_CLAP))?;
+        .expect(BAD_CLAP);
 
     if rates.len() != durations.len() {
-        return Err(CliError::invalid(
-            &mut command(),
-            ErrorKind::WrongNumberOfValues,
-            "The number of --rate and --duration arguments must match",
+        return Err(InvalidArgsError(
+            command()
+                .error(
+                    ErrorKind::WrongNumberOfValues,
+                    "The number of --rate and --duration arguments must match",
+                )
+                .render()
+                .to_string(),
         ));
     }
 
@@ -60,10 +61,14 @@ pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<LoadTestConfig, C
     while let Some((&rate, &duration)) = it.next() {
         // Check that only the last duration value is infinite.
         if duration.is_none() && it.peek().is_some() {
-            return Err(CliError::invalid(
-                &mut command(),
-                ErrorKind::ValueValidation,
-                "Only the last --duration value can be \"forever\"",
+            return Err(InvalidArgsError(
+                command()
+                    .error(
+                        ErrorKind::ValueValidation,
+                        "Only the last --duration value can be \"forever\"",
+                    )
+                    .render()
+                    .to_string(),
             ));
         }
 
@@ -77,10 +82,11 @@ pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<LoadTestConfig, C
                         duration,
                     }
                 } else {
-                    return Err(CliError::invalid(
-                        &mut command(),
-                        ErrorKind::ValueValidation,
-                        "Only fixed-rate segments may have a --duration value can be \"forever\"",
+                    return Err(InvalidArgsError(
+                        command().error(
+                            ErrorKind::ValueValidation,
+                            "Only fixed-rate segments may have a --duration value can be \"forever\""
+                        ).render().to_string()
                     ));
                 }
             }
@@ -89,13 +95,11 @@ pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<LoadTestConfig, C
         config.plan.segments.push(segment);
     }
 
-    config.plan.connections = *matches
-        .get_one::<u64>("connections")
-        .ok_or(anyhow!(BAD_CLAP))? as usize;
-    config.plan.http_method = *matches.get_one("http-method").ok_or(anyhow!(BAD_CLAP))?;
+    config.plan.connections = *matches.get_one::<u64>("connections").expect(BAD_CLAP) as usize;
+    config.plan.http_method = *matches.get_one("http-method").expect(BAD_CLAP);
     config.plan.targets = matches
         .get_many::<Url>("target")
-        .ok_or(anyhow!(BAD_CLAP))?
+        .expect(BAD_CLAP)
         .cloned()
         .collect::<Vec<_>>();
 
@@ -106,9 +110,7 @@ pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<LoadTestConfig, C
         .collect();
 
     config.plan.payload = matches.get_one::<String>("payload").cloned();
-    config.plan.latency_correction = *matches
-        .get_one("latency-correction")
-        .ok_or(anyhow!(BAD_CLAP))?;
+    config.plan.latency_correction = *matches.get_one("latency-correction").expect(BAD_CLAP);
 
     Ok(config)
 }
