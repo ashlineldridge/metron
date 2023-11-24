@@ -9,11 +9,13 @@ mod test;
 use std::{ffi::OsString, fmt::Display};
 
 use clap::error::ErrorKind;
-use metron::{ControllerConfig, LoadTestConfig, RunnerConfig};
+use metron::{ControllerConfig, RunnerConfig, TestConfig};
 use thiserror::Error;
 
 pub(crate) const BAD_CLAP: &str = "clap has been misconfigured";
 pub(crate) const BAD_SERDE: &str = "serde has been misconfigured";
+
+pub use parser::HttpHeader;
 
 pub fn parse<I, T>(it: I) -> Result<ParsedCli, InvalidArgsError>
 where
@@ -35,35 +37,19 @@ where
     };
 
     let (command, matches) = matches.subcommand().expect(BAD_CLAP);
-    let print_config = *matches.get_one("print-config").unwrap_or(&false);
 
     let result = match command {
         "test" => {
-            let config = test::parse_args(matches).expect(BAD_CLAP);
-            if print_config {
-                let text = serde_yaml::to_string(&config).expect(BAD_SERDE);
-                ParsedCli::PrintConfig(text)
-            } else {
-                ParsedCli::LoadTest(config)
-            }
+            let config = test::parse(matches).expect(BAD_CLAP);
+            ParsedCli::LoadTest(config)
         }
         "runner" => {
-            let config = runner::parse_args(matches).expect(BAD_CLAP);
-            if print_config {
-                let text = serde_yaml::to_string(&config).expect(BAD_SERDE);
-                ParsedCli::PrintConfig(text)
-            } else {
-                ParsedCli::Runner(config)
-            }
+            let config = runner::parse(matches).expect(BAD_CLAP);
+            ParsedCli::Runner(config)
         }
         "controller" => {
-            let config = controller::parse_args(matches).expect(BAD_CLAP);
-            if print_config {
-                let text = serde_yaml::to_string(&config).expect(BAD_SERDE);
-                ParsedCli::PrintConfig(text)
-            } else {
-                ParsedCli::Controller(config)
-            }
+            let config = controller::parse(matches).expect(BAD_CLAP);
+            ParsedCli::Controller(config)
         }
         _ => panic!("{}", BAD_CLAP),
     };
@@ -73,10 +59,9 @@ where
 
 #[derive(Clone, Debug)]
 pub enum ParsedCli {
-    LoadTest(LoadTestConfig),
+    LoadTest(TestConfig),
     Runner(RunnerConfig),
     Controller(ControllerConfig),
-    PrintConfig(String),
     Help(String),
 }
 

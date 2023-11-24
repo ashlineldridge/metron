@@ -1,13 +1,19 @@
 use std::{fs::File, io, time::Duration};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use either::Either;
-use metron::{Header, Rate};
+use metron::Rate;
 use serde::de::DeserializeOwned;
 use url::Url;
 use Either::{Left, Right};
 
 pub type RateArgValue = Either<Rate, (Rate, Rate)>;
+
+#[derive(Clone)]
+pub struct HttpHeader {
+    name: String,
+    value: String,
+}
 
 /// Request rate clap [`Arg::value_parser`][clap::Arg::value_parser].
 pub fn rate(value: &str) -> Result<RateArgValue> {
@@ -31,8 +37,8 @@ pub fn duration(value: &str) -> Result<Option<Duration>> {
     }
 }
 
-/// Target URL clap [`Arg::value_parser`][clap::Arg::value_parser].
-pub fn target(value: &str) -> Result<Url> {
+/// URL clap [`Arg::value_parser`][clap::Arg::value_parser].
+pub fn url(value: &str) -> Result<Url> {
     let url = value.parse::<url::Url>()?;
 
     if url.cannot_be_a_base() {
@@ -48,9 +54,9 @@ pub fn target(value: &str) -> Result<Url> {
 }
 
 /// Header clap [`Arg::value_parser`][clap::Arg::value_parser].
-pub fn header(value: &str) -> Result<Header> {
+pub fn header(value: &str) -> Result<HttpHeader> {
     if let Some((k, v)) = value.split_once(':') {
-        Ok(Header {
+        Ok(HttpHeader {
             name: k.to_owned(),
             value: v.to_owned(),
         })
@@ -64,22 +70,23 @@ pub fn config_file<T>(value: &str) -> Result<T>
 where
     T: DeserializeOwned,
 {
-    let config_error = |e: serde_yaml::Error| {
-        if let Some(loc) = e.location() {
-            anyhow!(format!(
-                "unexpected config file content at line {}, index {}",
-                loc.line(),
-                loc.index(),
-            ))
-        } else {
-            anyhow!("unexpected config file")
-        }
-    };
+    // let config_error = |e: serde_yaml::Error| {
+    //     if let Some(loc) = e.location() {
+    //         anyhow!(format!(
+    //             "unexpected config file content at line {}, index {}: {:?}",
+    //             loc.line(),
+    //             loc.index(),
+    //             e,
+    //         ))
+    //     } else {
+    //         anyhow!("unexpected config file")
+    //     }
+    // };
     let config = if value == "-" {
-        serde_yaml::from_reader(io::stdin()).map_err(config_error)?
+        serde_yaml::from_reader(io::stdin())?
     } else {
         let file = File::open(value)?;
-        serde_yaml::from_reader(file).map_err(config_error)?
+        serde_yaml::from_reader(file)?
     };
 
     Ok(config)

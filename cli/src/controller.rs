@@ -1,7 +1,7 @@
 use clap::{value_parser, ArgAction};
 use metron::ControllerConfig;
 
-use crate::{parser, InvalidArgsError};
+use crate::{parser, InvalidArgsError, BAD_CLAP};
 
 /// Creates the [`clap::Command`] for the `controller` subcommand.
 pub(crate) fn command() -> clap::Command {
@@ -20,11 +20,13 @@ to be composed.
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse_args(matches: &clap::ArgMatches) -> Result<ControllerConfig, InvalidArgsError> {
+pub(crate) fn parse(matches: &clap::ArgMatches) -> Result<ControllerConfig, InvalidArgsError> {
     let config = matches
-        .get_one::<ControllerConfig>("config-file")
+        .get_one::<ControllerConfig>("file")
         .cloned()
-        .unwrap_or_default();
+        .expect(BAD_CLAP);
+    // .cloned()
+    // .unwrap_or_default();
 
     Ok(config)
 }
@@ -39,13 +41,13 @@ fn all_arg_groups() -> Vec<clap::ArgGroup> {
     vec![]
 }
 
-/// Returns the [`clap::Arg`] for `--config-file`.
+/// Returns the [`clap::Arg`] for `--file`.
 fn arg_config_file() -> clap::Arg {
     const SHORT: &str = "Controller configuration file.";
     const LONG: &str = "\
 A configuration file to be used as an alternative to individual command line
 arguments. Stdin can also be used by specifying hyphen as the file name (i.e.
-`--config-file -`).
+`--file -`).
 
 When both a configuration file and individual command line arguments are used,
 the arguments will override their counterpart properties in the configuration
@@ -54,8 +56,8 @@ file.
 See --print-config for bootstrapping a configuration file.
 ";
 
-    clap::Arg::new("config-file")
-        .long("config-file")
+    clap::Arg::new("file")
+        .long("file")
         .value_name("FILE")
         .value_parser(parser::config_file::<ControllerConfig>)
         .help(SHORT)
@@ -89,16 +91,8 @@ Set the controller's gRPC port to PORT. Defaults to 9090.
     clap::Arg::new("port")
         .long("port")
         .value_name("PORT")
-        .default_value(default::PORT.as_str())
+        .default_value("9090")
         .value_parser(value_parser!(u16))
         .help(SHORT)
         .long_help(LONG)
-}
-
-mod default {
-    use super::*;
-    lazy_static::lazy_static! {
-        static ref CONFIG: ControllerConfig = ControllerConfig::default();
-        pub(super) static ref PORT: String = CONFIG.server_port.to_string();
-    }
 }

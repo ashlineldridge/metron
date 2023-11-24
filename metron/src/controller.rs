@@ -4,7 +4,7 @@ use anyhow::Context;
 use thiserror::Error;
 use tower::Service;
 
-use crate::LoadTestPlan;
+use crate::Plan;
 
 #[derive(Clone)]
 pub struct Controller<S> {
@@ -13,7 +13,7 @@ pub struct Controller<S> {
 
 impl<S> Controller<S>
 where
-    S: Service<LoadTestPlan> + Clone + Send + Sync + 'static,
+    S: Service<Plan> + Clone + Send + Sync + 'static,
     S::Response: Send + Sync + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
@@ -22,7 +22,7 @@ where
         Self { runners }
     }
 
-    pub async fn run(&self, plan: &LoadTestPlan) -> Result<(), ControllerError> {
+    pub async fn run(&self, plan: &Plan) -> Result<(), ControllerError> {
         // TODO: This needs to call the runners in parallel.
         let mut runner = self
             .runners
@@ -40,9 +40,9 @@ where
 }
 
 // For now, the Controller just gives the same plan to all runners.
-impl<S> Service<LoadTestPlan> for Controller<S>
+impl<S> Service<Plan> for Controller<S>
 where
-    S: Service<LoadTestPlan> + Clone + Send + Sync + 'static,
+    S: Service<Plan> + Clone + Send + Sync + 'static,
     S::Response: Send + Sync + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
     S::Future: Send + 'static,
@@ -58,7 +58,7 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: LoadTestPlan) -> Self::Future {
+    fn call(&mut self, req: Plan) -> Self::Future {
         let controller = self.clone();
         Box::pin(async move { controller.run(&req).await })
     }

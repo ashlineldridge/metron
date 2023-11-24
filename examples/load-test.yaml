@@ -1,0 +1,28 @@
+plan:
+  segments:
+  - kind: linear
+    rate_start: 100
+    rate_end: 200
+    duration: 1m
+  - kind: fixed
+    rate: 100
+    duration: 5m
+  actions:
+  - kind: http
+    method: post
+    target: https://foobar.com/authenticate
+    headers:
+    - name: User
+      value: aeldridge
+    payload: foobar
+  - kind: http
+    method: get
+    target: https://foobar.com/cart
+    headers:
+    - name: X-Metron-Bar
+      value: bar
+    payload: foobar
+telemetry:
+  logging:
+    level: info
+    format: json

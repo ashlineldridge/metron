@@ -17,12 +17,11 @@ message MetronResponse {
 }
 
 message Plan {
-  repeated Segment segments = 1;
-  // TODO: Needs to reflect actual plan and support multiple targets, etc.
-  string target = 2;
+  repeated RateSegment segments = 1;
+  repeated Action actions = 2;
 }
 
-message Segment {
+message RateSegment {
   oneof segment {
     FixedRateSegment fixed_rate_segment = 1;
     LinearRateSegment linear_rate_segment = 2;
@@ -31,11 +30,53 @@ message Segment {
 
 message FixedRateSegment {
   float rate = 1;
-  google.protobuf.Duration total_duration = 2;
+  google.protobuf.Duration duration = 2;
 }
 
 message LinearRateSegment {
   float rate_start = 1;
   float rate_end = 2;
-  google.protobuf.Duration total_duration = 3;
+  google.protobuf.Duration duration = 3;
+}
+
+message Action {
+  oneof action {
+    HttpAction http_action = 1;
+    UdpAction udp_action = 2;
+    ExecAction exec_action = 3;
+    WasmAction wasm_action = 4;
+  }
+}
+
+message HttpAction {
+  HttpMethod method = 1;
+  map<string, string> headers = 2;
+  string payload = 3;
+  string target = 4;
+}
+
+message UdpAction {
+  string payload = 1;
+  string target = 2;
+}
+
+message ExecAction {
+  string command = 1;
+  repeated string args = 2;
+  map<string, string> env = 3;
+}
+
+message WasmAction {
+}
+
+enum HttpMethod {
+  GET = 0;
+  POST = 1;
+  PUT = 2;
+  PATCH = 3;
+  DELETE = 4;
+  HEAD = 5;
+  OPTIONS = 6;
+  TRACE = 7;
+  CONNECT = 8;
 }

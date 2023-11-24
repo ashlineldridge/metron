@@ -117,14 +117,6 @@ OPTIONS:
 
             This argument is incompatible with --worker-threads and --signaller=blocking.
 
-        --connections <COUNT>
-            Sets the number of TCP connections that should be used.
-
-            TODO: Elaborate.
-
-
-            [default: 1]
-
         --signaller <NAME>
             Selects the type of signalling system that should be used to generate request
             timing signals. This is an advanced feature and the default behaviour will
