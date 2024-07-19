@@ -1,21 +1,34 @@
 //! CLI resources used by the 'metron` binary.
 
-mod controller;
 mod parser;
 mod root;
-mod runner;
-mod test;
+mod run;
 
 use std::{ffi::OsString, fmt::Display};
 
 use clap::error::ErrorKind;
-use metron::{ControllerConfig, RunnerConfig, TestConfig};
+use metron::RunConfig;
 use thiserror::Error;
 
 pub(crate) const BAD_CLAP: &str = "clap has been misconfigured";
 pub(crate) const BAD_SERDE: &str = "serde has been misconfigured";
 
 pub use parser::HttpHeader;
+
+#[derive(Clone, Debug)]
+pub enum ParsedCli {
+    Run(RunConfig),
+    Help(String),
+}
+
+#[derive(Error, Debug)]
+pub struct InvalidArgsError(String);
+
+impl Display for InvalidArgsError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 pub fn parse<I, T>(it: I) -> Result<ParsedCli, InvalidArgsError>
 where
@@ -39,37 +52,9 @@ where
     let (command, matches) = matches.subcommand().expect(BAD_CLAP);
 
     let result = match command {
-        "test" => {
-            let config = test::parse(matches).expect(BAD_CLAP);
-            ParsedCli::LoadTest(config)
-        }
-        "runner" => {
-            let config = runner::parse(matches).expect(BAD_CLAP);
-            ParsedCli::Runner(config)
-        }
-        "controller" => {
-            let config = controller::parse(matches).expect(BAD_CLAP);
-            ParsedCli::Controller(config)
-        }
+        "run" => ParsedCli::Run(run::parse(matches).expect(BAD_CLAP)),
         _ => panic!("{}", BAD_CLAP),
     };
 
     Ok(result)
-}
-
-#[derive(Clone, Debug)]
-pub enum ParsedCli {
-    LoadTest(TestConfig),
-    Runner(RunnerConfig),
-    Controller(ControllerConfig),
-    Help(String),
-}
-
-#[derive(Error, Debug)]
-pub struct InvalidArgsError(String);
-
-impl Display for InvalidArgsError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
 }

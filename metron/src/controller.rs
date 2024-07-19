@@ -1,13 +1,18 @@
 use std::{future::Future, pin::Pin, task::Poll};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use thiserror::Error;
 use tower::Service;
 
 use crate::Plan;
 
+// TODO: Rename Agents
 #[derive(Clone)]
 pub struct Controller<S> {
+    // TODO: This should either be passed a RunnerRegistry
+    // or an D: Discover where the implementation is a RunnerRegistry.
+    // In either case, the S service type needs to abstract over both remote
+    // and local runners so we'll go with a Box implementation to start with.
     runners: Vec<S>,
 }
 
@@ -53,9 +58,22 @@ where
 
     fn poll_ready(
         &mut self,
-        _cx: &mut std::task::Context<'_>,
+        cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+        let mut dead = 0;
+        for s in &mut self.runners {
+            match s.poll_ready(cx) {
+                Poll::Ready(Ok(_)) => return Poll::Ready(Ok(())),
+                Poll::Ready(Err(_)) => dead += 1,
+                _ => continue,
+            }
+        }
+
+        if dead == self.runners.len() {
+            return Poll::Ready(Err(anyhow!("all runners have terminally failed").into()));
+        }
+
+        Poll::Pending
     }
 
     fn call(&mut self, req: Plan) -> Self::Future {

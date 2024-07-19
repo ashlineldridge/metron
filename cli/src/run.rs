@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use clap::{error::ErrorKind, value_parser, ArgAction};
 use either::Either::{Left, Right};
-use metron::{Action, HttpMethod, Plan, RateSegment, TestConfig};
+use metron::{Action, HttpMethod, Plan, RateSegment, RunConfig, TestConfig};
 use url::Url;
 
 use crate::{
@@ -10,7 +10,7 @@ use crate::{
     InvalidArgsError, BAD_CLAP,
 };
 
-/// Creates the [`clap::Command`] for the `test` subcommand.
+/// Creates the [`clap::Command`] for the `run` subcommand.
 ///
 /// # Examples
 /// ```bash
@@ -20,22 +20,21 @@ use crate::{
 ///   https://example.com
 /// ```
 pub fn command() -> clap::Command {
-    const SHORT: &str = "Run a load test.";
+    const SHORT: &str = "Run a Metron configuration.";
     const LONG: &str = "\
-This command is used to run a load test according to a test plan and stream
-the results to a number of potential backends.
+This command is used to...
 ";
 
-    clap::Command::new("test")
+    clap::Command::new("run")
         .about(SHORT)
         .long_about(LONG)
         .args(all_args())
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse(matches: &clap::ArgMatches) -> Result<TestConfig, InvalidArgsError> {
+pub(crate) fn parse(matches: &clap::ArgMatches) -> Result<RunConfig, InvalidArgsError> {
     // If a config file was specified then use that.
-    if let Some(config) = matches.get_one::<TestConfig>("file") {
+    if let Some(config) = matches.get_one::<RunConfig>("file") {
         return Ok(config.clone());
     }
 
@@ -135,14 +134,18 @@ pub(crate) fn parse(matches: &clap::ArgMatches) -> Result<TestConfig, InvalidArg
         _ => panic!("{}", BAD_CLAP),
     };
 
-    Ok(TestConfig {
-        plan: Plan {
-            segments,
-            actions: vec![action],
-        },
-        runners: None,
-        runtime: None,
+    Ok(RunConfig {
+        port: Some(100),
+        local_runner: None,
+        remote_runners: vec![],
         telemetry: Default::default(),
+        tests: vec![TestConfig {
+            name: "default".to_owned(),
+            plan: Plan {
+                segments,
+                actions: vec![action],
+            },
+        }],
     })
 }
 

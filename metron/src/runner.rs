@@ -4,14 +4,22 @@ use thiserror::Error;
 use tower::Service;
 use tracing::info;
 
-use crate::Plan;
+use crate::{Plan, SignallerKind};
 
-#[derive(Clone, Default)]
-pub struct Runner {}
+#[derive(Clone)]
+pub struct Runner {
+    name: String,
+    signaller: SignallerKind,
+    worker_threads: usize,
+}
 
 impl Runner {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(name: String, signaller: SignallerKind, worker_threads: usize) -> Self {
+        Self {
+            name,
+            signaller,
+            worker_threads,
+        }
     }
 
     pub async fn run(&self, plan: &Plan) -> Result<(), RunnerError> {

@@ -1,0 +1,75 @@
+---
+# Could consider doing something like if port is not specified then
+# the console can't be detached and everything runs in the same process?
+port: 9090
+
+# Optional local_runner section - this is the typical way a user will
+# define a local runner. Could we get to the point where the local runner
+# is reduced to a boolean value - i.e. there is one or there is not (i.e.
+# a "proxy controller")? All other runner characteristics (e.g. number
+# of worker threads, number of connections / connection re-use, signaller
+# type, etc) are all specified as part of the plan.
+local_runner:
+  name: test0
+  signaller: dedicated
+  worker_threads: 4
+
+# Remote runner discovery: the controller employs load balancing algorithms to
+# determine which runner to instruct to increase the throughput to meet
+# the request.
+remote_runners:
+- kind: static
+  address: http://localhost:9091
+- kind: static
+  address: http://localhost:9091
+- kind: kubernetes
+  namespace: metron
+  selector:
+    pool: load-pool-a
+  port: 9191
+
+# Optional telemetry configuration.
+telemetry:
+  logging:
+    level: info
+    format: json
+  tracing:
+    enabled: false
+    sample_rate: 5
+  # When present the controller will expose Prometheus metrics under the
+  # configured port and path.
+  prometheus:
+    port: 9091
+    path: /metrics
+  # When present the controller will stream OTLP metrics and trace data to
+  # this endpoint.
+  open_telemetry:
+    address: otel-collector:4317
+
+# Tests can be empty array. E.g. we'd run the following:
+#   metron run -d/--detach -c config.yaml
+# without a plan to start a metron controller+runner
+# that was awaiting a plan from a client.
+tests:
+- name: test-sim-1
+  plan:
+    segments:
+    - kind: linear
+      rate_start: 100
+      rate_end: 200
+      duration: 1m
+    - kind: fixed
+      rate: 100
+      duration: 5m
+    actions:
+    - kind: http
+      method: post
+      target: https://foobar.com/authenticate
+      headers:
+        x-metron-user: aeldridge
+      payload: foobar
+    - kind: http
+      method: get
+      target: https://foobar.com/cart
+      headers:
+        x-metron-user: aeldridge

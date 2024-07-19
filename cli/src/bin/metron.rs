@@ -1,72 +1,108 @@
 //! Entry point for the main `metron` binary.
 
-use std::env;
+use std::{collections::HashMap, env, path::Components};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use cli::ParsedCli;
 use grpc::{MetronClient, MetronServer};
-use metron::{
-    Controller, ControllerConfig, Runner, RunnerConfig, RunnerDiscoveryConfig, TestConfig,
-};
+use metron::{Controller, RunConfig, Runner, RunnerRef, RunnerRegistry};
+use url::Url;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     // dump_config();
     let parsed_config = cli::parse(env::args_os())?;
     match parsed_config {
-        ParsedCli::LoadTest(config) => run_test(config).await?,
-        ParsedCli::Runner(config) => run_runner(config).await?,
-        ParsedCli::Controller(config) => run_controller(config).await?,
+        ParsedCli::Run(config) => run(&config).await?,
         ParsedCli::Help(text) => println!("{text}"),
     }
 
     Ok(())
 }
 
-async fn run_test(config: TestConfig) -> Result<()> {
-    if let Some(runner_discovery) = config.runners {
-        let runners = external_runners(&runner_discovery).await?;
-        let controller = Controller::new(runners);
-        controller.run(&config.plan).await?;
-    } else {
-        let controller = Controller::new(vec![Runner::new()]);
-        controller.run(&config.plan).await?;
+async fn run(config: &RunConfig) -> Result<()> {
+    // if let Some(runner) = &config.local_runner {}
+
+    let mut remote_runners = Vec::with_capacity(config.remote_runners.len());
+    for r in &config.remote_runners {
+        match r {
+            RunnerRef::Static { address } => todo!(),
+            RunnerRef::Kubernetes {
+                namespace,
+                selector,
+                port,
+            } => todo!(),
+        }
+        let runner = Runner::new(r.name.clone(), r.signaller, r.worker_threads);
     }
 
-    Ok(())
-}
+    // let registry = RunnerRegistry::new(runners);
+    // for r in &config.runner_discovery {
+    //     match r.address.scheme() {
+    //         "local" =>
+    //     }
+    // }
 
-async fn run_runner(config: RunnerConfig) -> Result<()> {
-    let port = config.port;
-    let runner = Runner::new();
-    let metron_server = MetronServer::new(runner, port);
+    // let target_runners = config.runner_discovery.iter().map(|r| match (r.remote, r.local) {
+    //     (Some(remote), None) => todo!(),
+    //     (None, Some(local)) => todo!(),
+    //     _ => bail!("invalid runner discovery"),
+    // })
+    // let controller = Controller::new(target_runners);
 
-    metron_server.listen().await?;
+    // let local_runners = config.runners.iter().map(|r| Runner::new(r.name.clone(), r.signaller, r.worker_threads)).collect();
 
-    Ok(())
-}
-
-// Runner addresses need to be of the form: http://[::1]:9090
-async fn run_controller(config: ControllerConfig) -> Result<()> {
-    let port = config.port;
-    let runners = external_runners(&config.runners).await?;
-    let controller = Controller::new(runners);
-    let metron_server = MetronServer::new(controller, port);
-
-    metron_server.listen().await?;
+    // if let Some(port) = config.port {
+    // } else {
+    // }
 
     Ok(())
 }
 
-async fn external_runners(config: &RunnerDiscoveryConfig) -> Result<Vec<MetronClient>> {
-    let mut runners = Vec::with_capacity(config.static_runners.len());
-    for endpoint in &config.static_runners {
-        let runner = MetronClient::connect(endpoint.clone()).await?;
-        runners.push(runner);
-    }
+// async fn run_test(config: TestConfig) -> Result<()> {
+//     if let Some(runner_discovery) = config.runners {
+//         let runners = external_runners(&runner_discovery).await?;
+//         let controller = Controller::new(runners);
+//         controller.run(&config.plan).await?;
+//     } else {
+//         let controller = Controller::new(vec![Runner::new()]);
+//         controller.run(&config.plan).await?;
+//     }
 
-    Ok(runners)
-}
+//     Ok(())
+// }
+
+// async fn run_runner(config: RunnerConfig) -> Result<()> {
+//     let port = config.port;
+//     let runner = Runner::new();
+//     let metron_server = MetronServer::new(runner, port);
+
+//     metron_server.listen().await?;
+
+//     Ok(())
+// }
+
+// // Runner addresses need to be of the form: http://[::1]:9090
+// async fn run_controller(config: ControllerConfig) -> Result<()> {
+//     let port = config.port;
+//     let runners = external_runners(&config.runners).await?;
+//     let controller = Controller::new(runners);
+//     let metron_server = MetronServer::new(controller, port);
+
+//     metron_server.listen().await?;
+
+//     Ok(())
+// }
+
+// async fn external_runners(config: &RunnerDiscoveryConfig) -> Result<Vec<MetronClient>> {
+//     let mut runners = Vec::with_capacity(config.static_runners.len());
+//     for endpoint in &config.static_runners {
+//         let runner = MetronClient::connect(endpoint.clone()).await?;
+//         runners.push(runner);
+//     }
+
+//     Ok(runners)
+// }
 
 // How CLI influences the composition of Metron components:
 //

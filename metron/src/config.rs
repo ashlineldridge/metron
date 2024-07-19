@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    fmt::Display,
     time::{Duration, Instant},
 };
 
@@ -8,44 +7,139 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-// --- Load Test Configuration ---
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct TestConfig {
-    pub plan: Plan,
-    pub runners: Option<RunnerDiscoveryConfig>,
-    pub runtime: Option<RuntimeConfig>,
-    pub telemetry: TelemetryConfig,
-}
-
-// --- Runner Configuration ---
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RunnerConfig {
-    pub port: u16,
-    pub runtime: RuntimeConfig,
-    pub telemetry: TelemetryConfig,
-}
-
-// --- Controller Configuration ---
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct ControllerConfig {
-    pub port: u16,
-    pub runners: RunnerDiscoveryConfig,
-    pub telemetry: TelemetryConfig,
-}
-
-// --- Run Config ---
+// ----- RunConfig -----
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RunConfig {
-    pub port: u16,
-    pub runners: RunnerDiscoveryConfig,
+    pub port: Option<u16>,
+
+    // Typical path through which a local runner is registered.
+    pub local_runner: Option<RunnerConfig>,
+
+    pub remote_runners: Vec<RunnerRef>,
+
     pub telemetry: TelemetryConfig,
+    pub tests: Vec<TestConfig>,
 }
 
-// --- Test Plan ---
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum RunnerRef {
+    Static {
+        address: Url,
+    },
+    Kubernetes {
+        namespace: String,
+        selector: HashMap<String, String>,
+        port: u16,
+    },
+    // Later on:
+    // AwsEcs { ... },
+    // GoogleCloudRun { ... },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RunnerConfig {
+    pub name: String,
+    pub signaller: SignallerKind,
+    pub worker_threads: usize,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct TelemetryConfig {
+    pub logging: LoggingConfig,
+    pub prometheus: Option<PrometheusConfig>,
+    pub open_telemetry: Option<OpenTelemetryConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct TestConfig {
+    pub name: String,
+    pub plan: Plan,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PrometheusConfig {
+    pub port: u16,
+    pub path: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct OpenTelemetryConfig {
+    pub address: Url,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct LoggingConfig {
+    pub level: LogLevel,
+    pub format: LogFormat,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum LogFormat {
+    Bunyan,
+    Json,
+}
+
+impl Default for LogFormat {
+    fn default() -> Self {
+        Self::Bunyan
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    Off,
+    Info,
+    Debug,
+    Warn,
+    Error,
+}
+
+impl Default for LogLevel {
+    fn default() -> Self {
+        Self::Error
+    }
+}
+
+impl From<LogLevel> for tracing_core::LevelFilter {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Off => tracing_core::LevelFilter::OFF,
+            LogLevel::Error => tracing_core::LevelFilter::ERROR,
+            LogLevel::Warn => tracing_core::LevelFilter::WARN,
+            LogLevel::Info => tracing_core::LevelFilter::INFO,
+            LogLevel::Debug => tracing_core::LevelFilter::DEBUG,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum SignallerKind {
+    Dedicated,
+    Cooperative,
+}
+
+pub type Rate = f32;
+pub type Headers = HashMap<String, String>;
+pub type Environment = HashMap<String, String>;
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
+#[serde(rename_all = "lowercase")]
+pub enum HttpMethod {
+    Get,
+    Post,
+    Put,
+    Patch,
+    Delete,
+    Head,
+    Options,
+    Trace,
+    Connect,
+}
 
 /// Load testing plan.
 ///
@@ -220,128 +314,5 @@ impl<'a> Iterator for Ticks<'a> {
         } else {
             None
         }
-    }
-}
-
-// --- Supporting Types ---
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct RunnerDiscoveryConfig {
-    #[serde(rename = "static")]
-    pub static_runners: Vec<String>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct TelemetryConfig {
-    pub open_telemetry: Option<OpenTelemetryBackend>,
-    pub logging: LoggingConfig,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct OpenTelemetryBackend {
-    pub endpoint: Url,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct LoggingConfig {
-    pub level: LogLevel,
-    pub format: LogFormat,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
-#[serde(rename_all = "lowercase")]
-pub enum LogFormat {
-    Bunyan,
-    Json,
-}
-
-impl Default for LogFormat {
-    fn default() -> Self {
-        Self::Bunyan
-    }
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
-#[serde(rename_all = "lowercase")]
-pub enum LogLevel {
-    Off,
-    Info,
-    Debug,
-    Warn,
-    Error,
-}
-
-impl Default for LogLevel {
-    fn default() -> Self {
-        Self::Error
-    }
-}
-
-impl From<LogLevel> for tracing_core::LevelFilter {
-    fn from(level: LogLevel) -> Self {
-        match level {
-            LogLevel::Off => tracing_core::LevelFilter::OFF,
-            LogLevel::Error => tracing_core::LevelFilter::ERROR,
-            LogLevel::Warn => tracing_core::LevelFilter::WARN,
-            LogLevel::Info => tracing_core::LevelFilter::INFO,
-            LogLevel::Debug => tracing_core::LevelFilter::DEBUG,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RuntimeConfig {
-    pub signaller: SignallerKind,
-    pub worker_threads: usize,
-}
-
-impl Default for RuntimeConfig {
-    fn default() -> Self {
-        Self {
-            signaller: SignallerKind::Dedicated,
-            worker_threads: num_cpus::get(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
-#[serde(rename_all = "lowercase")]
-pub enum SignallerKind {
-    Dedicated,
-    Cooperative,
-}
-
-pub type Rate = f32;
-pub type Headers = HashMap<String, String>;
-pub type Environment = HashMap<String, String>;
-
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
-#[serde(rename_all = "lowercase")]
-pub enum HttpMethod {
-    Get,
-    Post,
-    Put,
-    Patch,
-    Delete,
-    Head,
-    Options,
-    Trace,
-    Connect,
-}
-
-impl Default for HttpMethod {
-    fn default() -> Self {
-        Self::Get
-    }
-}
-
-// This impl is used to provide the default value used by clap. When Metron
-// becomes more protocol agnostic this can go away.
-impl Display for HttpMethod {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let value = serde_yaml::to_string(self).unwrap();
-        write!(f, "{}", value.trim())?;
-
-        Ok(())
     }
 }
