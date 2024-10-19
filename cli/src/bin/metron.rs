@@ -1,12 +1,10 @@
 //! Entry point for the main `metron` binary.
 
-use std::{collections::HashMap, env, path::Components};
+use std::env;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use cli::ParsedCli;
-use grpc::{MetronClient, MetronServer};
-use metron::{Controller, RunConfig, Runner, RunnerRef, RunnerRegistry};
-use url::Url;
+use metron::RunConfig;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -20,21 +18,20 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn run(config: &RunConfig) -> Result<()> {
+async fn run(_config: &RunConfig) -> Result<()> {
     // if let Some(runner) = &config.local_runner {}
-
-    let mut remote_runners = Vec::with_capacity(config.remote_runners.len());
-    for r in &config.remote_runners {
-        match r {
-            RunnerRef::Static { address } => todo!(),
-            RunnerRef::Kubernetes {
-                namespace,
-                selector,
-                port,
-            } => todo!(),
-        }
-        let runner = Runner::new(r.name.clone(), r.signaller, r.worker_threads);
-    }
+    // let mut remote_runners = Vec::with_capacity(config.remote_runners.len());
+    // for r in &config.remote_runners {
+    //     match r {
+    //         RunnerRef::Static { address } => todo!(),
+    //         RunnerRef::Kubernetes {
+    //             namespace,
+    //             selector,
+    //             port,
+    //         } => todo!(),
+    //     }
+    //     // let runner = Runner::new(r.name.clone(), r.signaller, r.worker_threads);
+    // }
 
     // let registry = RunnerRegistry::new(runners);
     // for r in &config.runner_discovery {
@@ -56,7 +53,8 @@ async fn run(config: &RunConfig) -> Result<()> {
     // } else {
     // }
 
-    Ok(())
+    // Ok(())
+    todo!()
 }
 
 // async fn run_test(config: TestConfig) -> Result<()> {
@@ -139,30 +137,30 @@ async fn run(config: &RunConfig) -> Result<()> {
 //    - Entry point will build a Plan and tell the Controller to run it
 //    - What about "runtime" config (e.g. thread settings, connections, etc)?
 
-fn dump_config() {
-    let plan = metron::Plan {
-        segments: vec![
-            metron::RateSegment::Fixed {
-                rate: 100.0,
-                duration: Some(std::time::Duration::from_secs(120)),
-            },
-            metron::RateSegment::Linear {
-                rate_start: 100.0,
-                rate_end: 200.0,
-                duration: std::time::Duration::from_secs(60),
-            },
-        ],
-        actions: vec![metron::Action::Http {
-            method: metron::HttpMethod::Get,
-            headers: [("foo".to_owned(), "bar".to_owned())].into_iter().collect(),
-            payload: "foobar".to_owned(),
-            target: "https://foobar.com".try_into().unwrap(),
-        }],
-    };
+// fn dump_config() {
+//     let plan = metron::Plan {
+//         segments: vec![
+//             metron::RateSegment::Fixed {
+//                 rate: 100.0,
+//                 duration: Some(std::time::Duration::from_secs(120)),
+//             },
+//             metron::RateSegment::Linear {
+//                 rate_start: 100.0,
+//                 rate_end: 200.0,
+//                 duration: std::time::Duration::from_secs(60),
+//             },
+//         ],
+//         actions: vec![metron::Action::Http {
+//             method: metron::HttpMethod::Get,
+//             headers: [("foo".to_owned(), "bar".to_owned())].into_iter().collect(),
+//             payload: "foobar".to_owned(),
+//             target: "https://foobar.com".try_into().unwrap(),
+//         }],
+//     };
 
-    let plan_text = serde_yaml::to_string(&plan).unwrap();
-    println!("{}", plan_text);
-}
+//     let plan_text = serde_yaml::to_string(&plan).unwrap();
+//     println!("{}", plan_text);
+// }
 
 // fn test_logging() {
 //     tracing_subscriber::fmt()
