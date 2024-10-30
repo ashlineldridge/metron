@@ -1,5 +1,6 @@
 //! CLI resources used by the 'metron` binary.
 
+mod config;
 mod parser;
 mod root;
 mod run;
@@ -7,7 +8,7 @@ mod run;
 use std::{ffi::OsString, fmt::Display};
 
 use clap::error::ErrorKind;
-use metron::RunConfig;
+use config::AgentConfig;
 use thiserror::Error;
 
 pub(crate) const BAD_CLAP: &str = "clap has been misconfigured";
@@ -17,7 +18,8 @@ pub use parser::HttpHeader;
 
 #[derive(Clone, Debug)]
 pub enum ParsedCli {
-    Run(RunConfig),
+    // TODO: Not really appropriate - needs to be a combination of testconfig and agentconfig I guess?
+    Run(AgentConfig),
     Help(String),
 }
 

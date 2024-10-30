@@ -1,7 +1,6 @@
 use std::{
     future::Future,
     hash::Hash,
-    marker::PhantomData,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
@@ -12,9 +11,9 @@ use thiserror::Error;
 use tower::{
     discover::{Change, Discover},
     ready_cache::ReadyCache,
-    Service, ServiceExt,
+    Service,
 };
-use tracing::{debug, trace};
+use tracing::debug;
 
 #[derive(Error, Debug)]
 pub enum SchedulerError {
@@ -90,7 +89,7 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, request: Req) -> Self::Future {
+    fn call(&mut self, _request: Req) -> Self::Future {
         Box::pin(async {
             tokio::time::sleep(Duration::from_millis(250)).await;
             Ok(())

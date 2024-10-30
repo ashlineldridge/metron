@@ -2,10 +2,11 @@ use std::time::Duration;
 
 use clap::{error::ErrorKind, value_parser, ArgAction};
 use either::Either::{Left, Right};
-use metron::{Action, HttpMethod, Plan, RateSegment, RunConfig, TestConfig};
+use metron::{Action, HttpMethod, Plan, RateSegment};
 use url::Url;
 
 use crate::{
+    config::RunConfig,
     parser::{self, RateArgValue},
     InvalidArgsError, BAD_CLAP,
 };

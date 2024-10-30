@@ -1,11 +1,11 @@
 #![feature(let_chains)]
 
 mod agent;
-mod config;
+mod plan;
 mod proxy;
 mod scheduler;
 
 pub use agent::*;
-pub use config::*;
+pub use plan::*;
 pub use proxy::*;
 pub use scheduler::*;

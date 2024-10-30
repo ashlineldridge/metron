@@ -1,11 +1,11 @@
-use std::{future::Future, hash::Hash, pin::Pin, task::Poll};
+use std::{future::Future, pin::Pin, task::Poll};
 
-use anyhow::anyhow;
-use tower::{balance::p2c::Balance, discover::Discover, Service};
+use tower::Service;
 
 use crate::Plan;
 
 #[derive(Clone)]
+#[allow(unused)]
 pub struct Proxy<D> {
     discover: D,
 }
@@ -23,7 +23,7 @@ impl<D> Proxy<D>
         Self { discover }
     }
 
-    pub async fn run(&self, plan: &Plan) -> Result<(), crate::AgentError> {
+    pub async fn run(&self, _plan: &Plan) -> Result<(), crate::AgentError> {
         // let mut balancer = Balance::new(self.discover.clone());
 
         // let requests = (1..10)
@@ -70,7 +70,7 @@ where
 
     fn poll_ready(
         &mut self,
-        cx: &mut std::task::Context<'_>,
+        _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
         // let mut dead = 0;
         // for s in &mut self.agents {

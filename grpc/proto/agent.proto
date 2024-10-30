@@ -19,14 +19,14 @@ service Agent {
 // RPC Requests & Responses
 
 message RunRequest {
-  TestPlan test_plan = 1;
+  Plan plan = 1;
   google.protobuf.Timestamp start_time = 2;
 }
 
 message RunResponse {}
 
 message ControlRequest {
-  TestPlan test_plan = 1;
+  Plan plan = 1;
   google.protobuf.Timestamp start_time = 2;
 }
 
@@ -47,7 +47,7 @@ message PollResponse {
 // ----------------------------------------------------------------------------
 // Test Plan
 
-message TestPlan {
+message Plan {
   repeated RateSegment segments = 1;
   repeated Action actions = 2;
 }

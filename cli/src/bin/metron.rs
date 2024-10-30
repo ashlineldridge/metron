@@ -4,7 +4,7 @@ use std::env;
 
 use anyhow::Result;
 use cli::ParsedCli;
-use metron::RunConfig;
+use metron::AgentConfig;
 
 #[tokio::main]
 async fn main() -> Result<()> {

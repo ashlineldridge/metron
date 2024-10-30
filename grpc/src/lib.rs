@@ -8,71 +8,36 @@ use anyhow::Context;
 use metron::{Action, HttpMethod, Plan, RateSegment};
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
-use tonic::{Request, Response, Streaming};
+use tonic::{Request, Response, Status, Streaming};
 use tower::Service;
 
 #[derive(Clone)]
-pub struct MetronClient {
-    inner: proto::metron_client::MetronClient<tonic::transport::Channel>,
+pub struct AgentClient {
+    inner: proto::agent_client::AgentClient<tonic::transport::Channel>,
 }
 
-impl MetronClient {
+impl AgentClient {
     pub async fn connect(server_addr: String) -> Result<Self, Error> {
-        let inner = proto::metron_client::MetronClient::connect(server_addr).await?;
-
+        let inner = proto::agent_client::AgentClient::connect(server_addr).await?;
         Ok(Self { inner })
     }
 }
 
-//TODO****NEXT: Flesh out Plan and gRPC Plan
-
-// TODO: I want the client (always run as `metron test` at the moment)
-// to have the option of running in "attached" and "detached" modes.
-// If you don't specify external agents then you must run in attached
-// mode (if you are running the controller or the runner then you also
-// must run in attached mode - this TODO really only applies to `metron test`).
-// Not yet sure how this will be implemented in the CLI - i.e. whether
-// it should be an arg (e.g. `metron test -r 500 -d 10m --interactive http://foo.com` - like `docker run -i`)
-// or whether `metron test` should just attach by
-// So, there should be a cohesive user experience. Let's start by making
-// `metron test` attach by default and stream (or be able to stream) the results
-// to stdout. It should also be possible to detach and attach to the `metron test`
-// process. Perhaps it could actually be a shell by default and you can run
-// in detached mode with --detach.
-//
-// Got it! So when you run metron as an all-in-one and then detach - you
-// are left with the exact same thing as if you just run the controller.
-// Note: that does also mean that the controller needs to be able to run
-// with a single local runner. Why would you ever want more than one
-// local runner? If no benefit allow it at the code level but disallow
-// it via config.
-
-// There should be a command `metron attach` that can be used to attach
-// (i.e. plug in to) any running metron process. A metron process can
-// only be a controller or a runner. When you run `metron test` and
-// specify a local runner, what's happening is that a Metron controller
-// is being started as a server and the local process is attaching to
-// it on the configured port. You can detach and re-attach as you please
-// (a number of clients could). Start by making it read only (i.e. the
-// attached client just streams results from the local controller/runner
-//
-// This is good but might change the config a bit. Prob for the better!
-//
-// Regardless, the MetronClient needs a way to a) stream updates from the
-// server to the client and b) send instructions to the server and c)
-impl MetronClient {
-    async fn run(&mut self, plan: &Plan) -> Result<(), Error> {
+impl AgentClient {
+    // TODO(NEXT): Add support for the other RPC methods. Below just demonstrates the Control RPC.
+    async fn run(&mut self, _plan: &Plan) -> Result<(), Error> {
         let outbound = async_stream::stream! {
             let mut interval = tokio::time::interval(Duration::from_secs(1));
 
             loop {
                 interval.tick().await;
 
-                let request = proto::MetronRequest {
+                let request = proto::ControlRequest {
                     plan: Some(proto::Plan {
                         segments: vec![],
                         actions: vec![],
                     }),
+                    start_time: None,
                 };
 
                 yield request;
@@ -80,7 +45,7 @@ impl MetronClient {
         };
 
         // TODO: Remove unwraps.
-        let response = self.inner.run(Request::new(outbound)).await?;
+        let response = self.inner.control(Request::new(outbound)).await?;
         let mut inbound = response.into_inner();
 
         while let Some(res) = inbound.message().await? {
@@ -91,7 +56,10 @@ impl MetronClient {
     }
 }
 
-impl Service<Plan> for MetronClient {
+// TODO: We need a general AgentRequest enum that contains the different types
+// then we need a Service implementation of AgentClient that pattern matches on
+// that enum and calls the actual gRPC methods (i.e. control, run, stop, poll).
+impl Service<Plan> for AgentClient {
     type Response = ();
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -110,12 +78,12 @@ impl Service<Plan> for MetronClient {
 }
 
 #[derive(Clone)]
-pub struct MetronServer<S> {
+pub struct AgentServer<S> {
     inner: S,
     port: u16,
 }
 
-impl<S> MetronServer<S>
+impl<S> AgentServer<S>
 where
     S: Service<Plan> + Send + Sync + Clone + 'static,
     S::Error: std::fmt::Debug, // This can be removed once proper error handling is in place
@@ -130,7 +98,7 @@ where
             .parse()
             .map_err(|e: AddrParseError| Error::Unexpected(e.into()))?;
 
-        let server = proto::metron_server::MetronServer::new(self);
+        let server = proto::agent_server::AgentServer::new(self);
 
         println!("metron server listening on {}", address);
         tonic::transport::Server::builder()
@@ -143,19 +111,26 @@ where
 }
 
 #[tonic::async_trait]
-impl<S> proto::metron_server::Metron for MetronServer<S>
+impl<S> proto::agent_server::Agent for AgentServer<S>
 where
     S: Service<Plan> + Send + Sync + Clone + 'static,
     S::Error: std::fmt::Debug,
     S::Future: Send + 'static,
 {
-    type RunStream =
-        Pin<Box<dyn Stream<Item = Result<proto::MetronResponse, tonic::Status>> + Send + 'static>>;
+    type ControlStream =
+        Pin<Box<dyn Stream<Item = Result<proto::ControlResponse, tonic::Status>> + Send + 'static>>;
 
     async fn run(
         &self,
-        request: Request<Streaming<proto::MetronRequest>>,
-    ) -> Result<Response<Self::RunStream>, tonic::Status> {
+        _request: Request<proto::RunRequest>,
+    ) -> Result<Response<proto::RunResponse>, Status> {
+        Ok(Response::new(proto::RunResponse {}))
+    }
+
+    async fn control(
+        &self,
+        request: Request<Streaming<proto::ControlRequest>>,
+    ) -> Result<Response<Self::ControlStream>, tonic::Status> {
         let mut stream = request.into_inner();
 
         let mut inner = self.inner.clone();
@@ -164,15 +139,29 @@ where
                 let req = req?;
                 let plan = req.plan.ok_or_else(|| tonic::Status::invalid_argument("missing plan"))?;
                 let plan: Plan = plan.try_into().unwrap();
-                let target = "TODO".to_string();
+                let _target = "TODO".to_string();
 
                 inner.call(plan).await.expect("service call failed");
 
-                yield proto::MetronResponse { target };
+                yield proto::ControlResponse { };
             }
         };
 
-        Ok(Response::new(Box::pin(output) as Self::RunStream))
+        Ok(Response::new(Box::pin(output) as Self::ControlStream))
+    }
+
+    async fn stop(
+        &self,
+        _request: Request<proto::StopRequest>,
+    ) -> Result<Response<proto::StopResponse>, Status> {
+        Ok(Response::new(proto::StopResponse {}))
+    }
+
+    async fn poll(
+        &self,
+        _request: Request<proto::PollRequest>,
+    ) -> Result<Response<proto::PollResponse>, tonic::Status> {
+        Ok(Response::new(proto::PollResponse { stats: None }))
     }
 }
 
@@ -243,6 +232,7 @@ impl TryFrom<RateSegment> for proto::RateSegment {
         };
 
         Ok(proto::RateSegment {
+            name: "TODO".to_owned(),
             segment: Some(segment),
         })
     }
@@ -255,7 +245,7 @@ impl TryFrom<proto::RateSegment> for RateSegment {
         let segment = value.segment.as_ref().context("missing rate segment")?;
         let segment = match segment {
             proto::rate_segment::Segment::FixedRateSegment(s) => {
-                let duration = s.duration.clone().map(TryInto::try_into).transpose()?;
+                let duration = s.duration.map(TryInto::try_into).transpose()?;
                 RateSegment::Fixed {
                     rate: s.rate,
                     duration,
@@ -266,7 +256,6 @@ impl TryFrom<proto::RateSegment> for RateSegment {
                 rate_end: s.rate_end,
                 duration: s
                     .duration
-                    .clone()
                     .context("linear rate segments must specify a duration")?
                     .try_into()?,
             },
@@ -289,21 +278,24 @@ impl TryFrom<Action> for proto::Action {
             } => {
                 let method = TryInto::<proto::HttpMethod>::try_into(method)? as i32;
                 Self {
+                    name: "TODO".to_owned(),
                     action: Some(proto::action::Action::HttpAction(proto::HttpAction {
                         method,
                         headers,
-                        payload,
+                        payload: payload.into_bytes(),
                         target: target.to_string(),
                     })),
                 }
             }
             Action::Udp { payload, target } => Self {
+                name: "TODO".to_owned(),
                 action: Some(proto::action::Action::UdpAction(proto::UdpAction {
-                    payload,
+                    payload: payload.into_bytes(),
                     target: target.to_string(),
                 })),
             },
             Action::Exec { command, args, env } => Self {
+                name: "TODO".to_owned(),
                 action: Some(proto::action::Action::ExecAction(proto::ExecAction {
                     command,
                     args,
@@ -324,18 +316,18 @@ impl TryFrom<proto::Action> for Action {
         let action = value.action.context("missing action")?;
         let action = match action {
             proto::action::Action::HttpAction(a) => {
-                let method = proto::HttpMethod::from_i32(a.method)
+                let method = proto::HttpMethod::try_from(a.method)
                     .context("invalid HTTP method")?
                     .try_into()?;
                 Self::Http {
                     method,
                     headers: a.headers,
-                    payload: a.payload,
+                    payload: "TODO".to_owned(),
                     target: a.target.parse()?,
                 }
             }
             proto::action::Action::UdpAction(a) => Self::Udp {
-                payload: a.payload,
+                payload: "TODO".to_owned(),
                 target: a.target.parse()?,
             },
             proto::action::Action::ExecAction(a) => Self::Exec {
@@ -343,7 +335,7 @@ impl TryFrom<proto::Action> for Action {
                 args: a.args,
                 env: a.env,
             },
-            proto::action::Action::WasmAction(a) => Self::Wasm {},
+            proto::action::Action::WasmAction(_) => Self::Wasm {},
         };
 
         Ok(action)
