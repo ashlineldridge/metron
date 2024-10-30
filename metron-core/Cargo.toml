@@ -3,21 +3,14 @@ name = "metron-core"
 version = "0.1.0"
 edition = "2021"
 
-# TODO: Some of these dependencies/features can be removed.
 [dependencies]
-anyhow = "1.0.90"
-clap = { version = "4.5.20", features = ["derive"] }
-futures-core = "0.3.31"
-humantime-serde = "1.1.1"
-hyper = { version = "1.5.0", features = ["full"] }
-hyper-tls = "0.6.0"
-hyper-util = { version = "0.1.9", features = ["tokio"] }
-num_cpus = "1.16.0"
-pin-project = "1.1.6"
-serde = { version = "1.0.210", features = ["derive"] }
-serde_yaml = "0.9.34"
-thiserror = "1.0.64"
-tokio = { version = "1.40.0", features = ["rt"] }
-tower = { version = "0.5.1", features = ["balance"] }
-tracing = "0.1.40"
-url = { version = "2.5.2", features = ["serde"] }
+anyhow.workspace          = true
+clap.workspace            = true
+futures-core.workspace    = true
+humantime-serde.workspace = true
+serde.workspace           = true
+thiserror.workspace       = true
+tokio.workspace           = true
+tower.workspace           = true
+tracing.workspace         = true
+url.workspace             = true

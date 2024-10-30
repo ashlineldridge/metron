@@ -4,18 +4,17 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.90"
-async-stream = "0.3.6"
-async-trait = "0.1.83"
-metron-core = { path = "../metron-core" }
-prost = "0.13.3"
-prost-types = "0.13.3"
-thiserror = "1.0.64"
-tokio = "1.40.0"
-tokio-stream = "0.1.16"
-tonic = "0.12.3"
-tower = "0.5.1"
-url = "2.5.2"
+anyhow.workspace       = true
+async-stream.workspace = true
+async-trait.workspace  = true
+metron-core            = { path = "../metron-core" }
+prost-types.workspace  = true
+prost.workspace        = true
+thiserror.workspace    = true
+tokio-stream.workspace = true
+tokio.workspace        = true
+tonic.workspace        = true
+tower.workspace        = true
 
 [build-dependencies]
-tonic-build = "0.12.3"
+tonic-build.workspace  = true

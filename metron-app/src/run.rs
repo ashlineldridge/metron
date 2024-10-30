@@ -6,7 +6,6 @@ use metron_config::{AgentConfig, LoggingConfig, RunConfig, SignallerKind};
 use metron_core::{Action, HttpMethod, Plan, RateSegment};
 use url::Url;
 
-// TODO: Can you group by std \n external \n metron?
 use crate::{
     parser::{self, RateArgValue},
     InvalidArgsError, BAD_CLAP,
