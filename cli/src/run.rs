@@ -6,7 +6,7 @@ use metron::{Action, HttpMethod, Plan, RateSegment};
 use url::Url;
 
 use crate::{
-    config::RunConfig,
+    config::{AgentConfig, LoggingConfig, RunConfig, SignallerKind},
     parser::{self, RateArgValue},
     InvalidArgsError, BAD_CLAP,
 };
@@ -136,17 +136,20 @@ pub(crate) fn parse(matches: &clap::ArgMatches) -> Result<RunConfig, InvalidArgs
     };
 
     Ok(RunConfig {
-        port: Some(100),
-        local_runner: None,
-        remote_runners: vec![],
-        telemetry: Default::default(),
-        tests: vec![TestConfig {
-            name: "default".to_owned(),
-            plan: Plan {
-                segments,
-                actions: vec![action],
-            },
-        }],
+        agent: AgentConfig {
+            name: "TODO".to_owned(),
+            signaller: SignallerKind::Dedicated,
+            worker_threads: 8,
+            logging: LoggingConfig::default(),
+            prometheus: None,
+            open_telemetry: None,
+            file_output: None,
+            proxy: vec![],
+        },
+        plan: Plan {
+            segments,
+            actions: vec![action],
+        },
     })
 }
 
@@ -183,7 +186,7 @@ See --print-config for bootstrapping a configuration file.
         .short('f')
         .long("file")
         .value_name("FILE")
-        .value_parser(parser::config_file::<TestConfig>)
+        .value_parser(parser::config_file::<RunConfig>)
         .required_unless_present_all(["rate", "duration"])
         .conflicts_with_all(["rate", "duration"])
         .help(SHORT)

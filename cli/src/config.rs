@@ -1,4 +1,7 @@
-// TODO(ashlin.eldridge): TBD on what in here is actually part of "the domain".
+// TODO(ashlin.eldridge): Consider moving the config into its own crate. E.g.
+// If there were multiple clis, but shared config types, wouldn't we end up with,
+// e.g, metron-cli, operator-cli, and then still have a common config crate?
+// Probably not to worry for now. Can just leave here.
 
 use std::time::Duration;
 
