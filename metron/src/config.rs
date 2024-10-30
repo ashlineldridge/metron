@@ -1,3 +1,5 @@
+// TODO(ashlin.eldridge): TBD on what in here is actually part of "the domain".
+
 use std::{
     collections::HashMap,
     time::{Duration, Instant},
@@ -7,55 +9,23 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-// ----- RunConfig -----
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RunConfig {
-    pub port: Option<u16>,
-
-    // Typical path through which a local runner is registered.
-    pub local_runner: Option<RunnerConfig>,
-
-    pub remote_runners: Vec<RunnerRef>,
-
-    pub telemetry: TelemetryConfig,
-    pub tests: Vec<TestConfig>,
+pub struct AgentConfig {
+    pub name: String,
+    pub signaller: SignallerKind,
+    pub worker_threads: usize,
+    pub logging: LoggingConfig,
+    pub prometheus: Option<PrometheusConfig>,
+    pub open_telemetry: Option<OpenTelemetryConfig>,
+    pub file_output: Option<FileOutputConfig>,
+    pub proxy: Vec<AgentDiscovery>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
-pub enum RunnerRef {
-    Static {
-        address: Url,
-    },
-    Kubernetes {
-        namespace: String,
-        selector: HashMap<String, String>,
-        port: u16,
-    },
-    // Later on:
-    // AwsEcs { ... },
-    // GoogleCloudRun { ... },
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RunnerConfig {
-    pub name: String,
-    pub signaller: SignallerKind,
-    pub worker_threads: usize,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct TelemetryConfig {
-    pub logging: LoggingConfig,
-    pub prometheus: Option<PrometheusConfig>,
-    pub open_telemetry: Option<OpenTelemetryConfig>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct TestConfig {
-    pub name: String,
-    pub plan: Plan,
+pub enum AgentDiscovery {
+    Static { ip_addresses: Vec<String> },
+    DnsRecord { refresh: Duration, dns_name: String },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -67,6 +37,13 @@ pub struct PrometheusConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct OpenTelemetryConfig {
     pub address: Url,
+    pub period: Duration,
+    pub timeout: Duration,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct FileOutputConfig {
+    pub path: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -121,6 +98,44 @@ impl From<LogLevel> for tracing_core::LevelFilter {
 pub enum SignallerKind {
     Dedicated,
     Cooperative,
+}
+
+// ---> Old stuff below.
+
+// #[derive(Clone, Debug, Deserialize, Serialize)]
+// pub struct RunConfig {
+//     pub port: Option<u16>,
+
+//     // Typical path through which a local runner is registered.
+//     pub local_runner: Option<RunnerConfig>,
+
+//     pub remote_runners: Vec<RunnerRef>,
+
+//     pub telemetry: TelemetryConfig,
+//     pub tests: Vec<TestConfig>,
+// }
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum RunnerRef {
+    Static {
+        address: Url,
+    },
+    Kubernetes {
+        namespace: String,
+        selector: HashMap<String, String>,
+        port: u16,
+    },
+    // Later on:
+    // AwsEcs { ... },
+    // GoogleCloudRun { ... },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RunnerConfig {
+    pub name: String,
+    pub signaller: SignallerKind,
+    pub worker_threads: usize,
 }
 
 pub type Rate = f32;
@@ -208,6 +223,13 @@ pub enum Action {
         args: Vec<String>,
         env: Environment,
     },
+    // See: https://docs.datadoghq.com/synthetics/api_tests/grpc_tests/?tab=behaviorcheck
+    // Grpc {
+    //     // What is a stronger type to use here?
+    //     // proto_file: String,
+    //     // rpc: String,
+    //     // payload: String,
+    // },
     Wasm {
         // TODO: For running a WASM module.
     },
@@ -269,7 +291,7 @@ impl<'a> Ticks<'a> {
     }
 }
 
-impl<'a> Iterator for Ticks<'a> {
+impl Iterator for Ticks<'_> {
     type Item = Instant;
 
     fn next(&mut self) -> Option<Self::Item> {

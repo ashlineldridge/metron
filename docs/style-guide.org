@@ -4,19 +4,8 @@ This is a simple coding style guide for the Metron codebase. Where practical, st
 
 ** Code Comments
 *** Function Comments
-Short comments should be worded in the imperative mood. For example, the following is correct:
+Use third person =// Creates the foo= rather than second person =// Create the foo=. This reads more naturally and seems to be in-keeping with the Rust standard library (e.g. =Option=). See also the Google Style Guide [[https://developers.google.com/style/reference-verbs][here]].
 
-#+begin_src rust
-  /// Find the `Thing` with ID `id`.
-  fn find_thing(&self, id: &str) -> Option<Thing> { todo!() }
-#+end_src
-
-While the following should be avoided:
-
-#+begin_src rust
-  /// Finds the `Thing` with ID `id`.
-  fn find_thing(&self, id: &str) -> Option<Thing> { todo!() }
-#+end_src
 ** Type and Implementation Ordering
 Group structs, enums, etc with their impl blocks. E.g.:
 #+begin_src rust
@@ -32,6 +21,7 @@ Group structs, enums, etc with their impl blocks. E.g.:
   impl A {}
   impl B {}
 #+end_src
+
 ** Errors
 Define errors near to their "unit of fallibility" as per [[https://sabrinajewson.org/blog/errors][this article]]. As also mentioned in the article, follow the standard library's example of lower case error messages.
 

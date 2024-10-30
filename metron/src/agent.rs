@@ -1,19 +1,25 @@
 use std::{future::Future, pin::Pin, task::Poll};
 
 use thiserror::Error;
-use tower::Service;
+use tower::{balance::p2c::Balance, Service};
 use tracing::info;
 
 use crate::{Plan, SignallerKind};
 
+#[derive(Error, Debug)]
+pub enum AgentError {
+    #[error(transparent)]
+    Unexpected(#[from] anyhow::Error),
+}
+
 #[derive(Clone)]
-pub struct Runner {
+pub struct Agent {
     name: String,
     signaller: SignallerKind,
     worker_threads: usize,
 }
 
-impl Runner {
+impl Agent {
     pub fn new(name: String, signaller: SignallerKind, worker_threads: usize) -> Self {
         Self {
             name,
@@ -22,16 +28,21 @@ impl Runner {
         }
     }
 
-    pub async fn run(&self, plan: &Plan) -> Result<(), RunnerError> {
-        info!("runner is executing the plan {:?}", plan);
+    pub async fn run(&self, plan: &Plan) -> Result<(), AgentError> {
+        info!("agent is executing the plan {:?}", plan);
 
         Ok(())
     }
 }
 
-impl Service<Plan> for Runner {
+struct AgentRequest {
+    plan: Plan,
+    // start_time: Option<Time>,
+}
+
+impl Service<Plan> for Agent {
     type Response = ();
-    type Error = RunnerError;
+    type Error = AgentError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(
@@ -42,13 +53,7 @@ impl Service<Plan> for Runner {
     }
 
     fn call(&mut self, req: Plan) -> Self::Future {
-        let runner = self.clone();
-        Box::pin(async move { runner.run(&req).await })
+        let agent = self.clone();
+        Box::pin(async move { agent.run(&req).await })
     }
-}
-
-#[derive(Error, Debug)]
-pub enum RunnerError {
-    #[error(transparent)]
-    Unexpected(#[from] anyhow::Error),
 }

@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+package proto;
+
+// ----------------------------------------------------------------------------
+// Agent Service
+
+service Agent {
+  rpc Run(RunRequest) returns (RunResponse);
+  rpc Control(stream ControlRequest) returns (stream ControlResponse);
+  rpc Stop(StopRequest) returns (StopResponse);
+  rpc Poll(PollRequest) returns (PollResponse);
+}
+
+// ----------------------------------------------------------------------------
+// RPC Requests & Responses
+
+message RunRequest {
+  TestPlan test_plan = 1;
+  google.protobuf.Timestamp start_time = 2;
+}
+
+message RunResponse {}
+
+message ControlRequest {
+  TestPlan test_plan = 1;
+  google.protobuf.Timestamp start_time = 2;
+}
+
+message ControlResponse {}
+
+message StopRequest {}
+
+message StopResponse {}
+
+message PollRequest {
+  google.protobuf.Duration duration = 1;
+}
+
+message PollResponse {
+  PollStats stats = 1;
+}
+
+// ----------------------------------------------------------------------------
+// Test Plan
+
+message TestPlan {
+  repeated RateSegment segments = 1;
+  repeated Action actions = 2;
+}
+
+message RateSegment {
+  string name = 1;
+  oneof segment {
+    FixedRateSegment fixed_rate_segment = 2;
+    LinearRateSegment linear_rate_segment = 3;
+  }
+}
+
+message FixedRateSegment {
+  float rate = 1;
+  google.protobuf.Duration duration = 2;
+}
+
+message LinearRateSegment {
+  float rate_start = 1;
+  float rate_end = 2;
+  google.protobuf.Duration duration = 3;
+}
+
+message Action {
+  string name = 1;
+  oneof action {
+    HttpAction http_action = 2;
+    UdpAction udp_action = 3;
+    ExecAction exec_action = 4;
+    WasmAction wasm_action = 5;
+  }
+}
+
+message HttpAction {
+  string target = 1;
+  HttpMethod method = 2;
+  map<string, string> headers = 3;
+  bytes payload = 4;
+}
+
+enum HttpMethod {
+  GET = 0;
+  POST = 1;
+  PUT = 2;
+  PATCH = 3;
+  DELETE = 4;
+  HEAD = 5;
+  OPTIONS = 6;
+  TRACE = 7;
+  CONNECT = 8;
+}
+
+message TcpAction {
+  string target = 1;
+  bytes payload = 2;
+}
+
+message UdpAction {
+  string target = 1;
+  bytes payload = 2;
+}
+
+message ExecAction {
+  string command = 1;
+  repeated string args = 2;
+  map<string, string> env = 3;
+}
+
+message GrpcAction {
+  // E.g. see https://docs.datadoghq.com/synthetics/api_tests/grpc_tests/?tab=behaviorcheck.
+}
+
+message WasmAction {
+}
+
+// ----------------------------------------------------------------------------
+// Poll Statistics
+
+message PollStats {}
