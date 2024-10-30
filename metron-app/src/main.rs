@@ -3,12 +3,12 @@
 use std::env;
 
 use anyhow::Result;
-use cli::{config::RunConfig, ParsedCli};
+use metron_app::{parse, ParsedCli};
+use metron_config::RunConfig;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // dump_config();
-    let parsed_config = cli::parse(env::args_os())?;
+    let parsed_config = parse(env::args_os())?;
     match parsed_config {
         ParsedCli::Run(config) => run(&config).await?,
         ParsedCli::Help(text) => println!("{text}"),

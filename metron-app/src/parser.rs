@@ -2,7 +2,7 @@ use std::{fs::File, io, time::Duration};
 
 use anyhow::{bail, Result};
 use either::Either;
-use metron::Rate;
+use metron_core::Rate;
 use serde::de::DeserializeOwned;
 use url::Url;
 use Either::{Left, Right};
@@ -10,6 +10,7 @@ use Either::{Left, Right};
 pub type RateArgValue = Either<Rate, (Rate, Rate)>;
 
 #[derive(Clone)]
+#[allow(unused)]
 pub struct HttpHeader {
     name: String,
     value: String,

@@ -1,6 +1,5 @@
 //! CLI resources used by the 'metron` binary.
 
-pub mod config;
 mod parser;
 mod root;
 mod run;
@@ -8,11 +7,12 @@ mod run;
 use std::{ffi::OsString, fmt::Display};
 
 use clap::error::ErrorKind;
+use metron_config::RunConfig;
 use thiserror::Error;
 
-use crate::config::RunConfig;
-
 pub(crate) const BAD_CLAP: &str = "clap has been misconfigured";
+
+#[allow(unused)]
 pub(crate) const BAD_SERDE: &str = "serde has been misconfigured";
 
 pub use parser::HttpHeader;

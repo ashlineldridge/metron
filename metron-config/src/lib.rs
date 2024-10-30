@@ -1,12 +1,7 @@
-// TODO(ashlin.eldridge): Consider moving the config into its own crate. E.g.
-// If there were multiple clis, but shared config types, wouldn't we end up with,
-// e.g, metron-cli, operator-cli, and then still have a common config crate?
-// Probably not to worry for now. Can just leave here.
-
 use std::time::Duration;
 
 use clap::ValueEnum;
-use metron::Plan;
+use metron_core::Plan;
 use serde::{Deserialize, Serialize};
 use url::Url;
 

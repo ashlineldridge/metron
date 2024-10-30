@@ -1,9 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-  "cli",
-  "grpc",
-  "metron",
+  "metron-app",
+  "metron-config",
+  "metron-core",  
+  "metron-grpc",
 ]
 
 ### TODO: use workspace dependencies, etc

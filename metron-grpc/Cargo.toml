@@ -1,5 +1,5 @@
 [package]
-name = "grpc"
+name = "metron-grpc"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,7 +7,7 @@ edition = "2021"
 anyhow = "1.0.90"
 async-stream = "0.3.6"
 async-trait = "0.1.83"
-metron = { path = "../metron" }
+metron-core = { path = "../metron-core" }
 prost = "0.13.3"
 prost-types = "0.13.3"
 thiserror = "1.0.64"

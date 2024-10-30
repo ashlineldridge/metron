@@ -5,7 +5,7 @@ mod proto {
 use std::{future::Future, net::AddrParseError, pin::Pin, task::Poll, time::Duration};
 
 use anyhow::Context;
-use metron::{Action, HttpMethod, Plan, RateSegment};
+use metron_core::{Action, HttpMethod, Plan, RateSegment};
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
 use tonic::{Request, Response, Status, Streaming};

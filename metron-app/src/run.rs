@@ -2,11 +2,12 @@ use std::time::Duration;
 
 use clap::{error::ErrorKind, value_parser, ArgAction};
 use either::Either::{Left, Right};
-use metron::{Action, HttpMethod, Plan, RateSegment};
+use metron_config::{AgentConfig, LoggingConfig, RunConfig, SignallerKind};
+use metron_core::{Action, HttpMethod, Plan, RateSegment};
 use url::Url;
 
+// TODO: Can you group by std \n external \n metron?
 use crate::{
-    config::{AgentConfig, LoggingConfig, RunConfig, SignallerKind},
     parser::{self, RateArgValue},
     InvalidArgsError, BAD_CLAP,
 };
