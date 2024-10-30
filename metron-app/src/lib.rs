@@ -2,12 +2,12 @@
 
 mod parser;
 mod root;
-mod run;
+mod test;
 
 use std::{ffi::OsString, fmt::Display};
 
 use clap::error::ErrorKind;
-use metron_config::RunConfig;
+use metron_config::{AgentConfig, TestConfig};
 use thiserror::Error;
 
 pub(crate) const BAD_CLAP: &str = "clap has been misconfigured";
@@ -19,7 +19,8 @@ pub use parser::HttpHeader;
 
 #[derive(Clone, Debug)]
 pub enum ParsedCli {
-    Run(RunConfig),
+    Test(TestConfig),
+    Agent(AgentConfig),
     Help(String),
 }
 
@@ -54,7 +55,7 @@ where
     let (command, matches) = matches.subcommand().expect(BAD_CLAP);
 
     let result = match command {
-        "run" => ParsedCli::Run(run::parse(matches).expect(BAD_CLAP)),
+        "run" => ParsedCli::Test(test::parse(matches).expect(BAD_CLAP)),
         _ => panic!("{}", BAD_CLAP),
     };
 

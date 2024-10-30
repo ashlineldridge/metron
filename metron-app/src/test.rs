@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use clap::{error::ErrorKind, value_parser, ArgAction};
 use either::Either::{Left, Right};
-use metron_config::{AgentConfig, LoggingConfig, RunConfig, SignallerKind};
+use metron_config::{AgentConfig, LoggingConfig, SignallerKind, TestConfig};
 use metron_core::{Action, HttpMethod, Plan, RateSegment};
 use url::Url;
 
@@ -33,9 +33,9 @@ This command is used to...
         .disable_version_flag(true)
 }
 
-pub(crate) fn parse(matches: &clap::ArgMatches) -> Result<RunConfig, InvalidArgsError> {
+pub(crate) fn parse(matches: &clap::ArgMatches) -> Result<TestConfig, InvalidArgsError> {
     // If a config file was specified then use that.
-    if let Some(config) = matches.get_one::<RunConfig>("file") {
+    if let Some(config) = matches.get_one::<TestConfig>("file") {
         return Ok(config.clone());
     }
 
@@ -135,7 +135,7 @@ pub(crate) fn parse(matches: &clap::ArgMatches) -> Result<RunConfig, InvalidArgs
         _ => panic!("{}", BAD_CLAP),
     };
 
-    Ok(RunConfig {
+    Ok(TestConfig {
         agent: AgentConfig {
             name: "TODO".to_owned(),
             signaller: SignallerKind::Dedicated,
@@ -186,7 +186,7 @@ See --print-config for bootstrapping a configuration file.
         .short('f')
         .long("file")
         .value_name("FILE")
-        .value_parser(parser::config_file::<RunConfig>)
+        .value_parser(parser::config_file::<TestConfig>)
         .required_unless_present_all(["rate", "duration"])
         .conflicts_with_all(["rate", "duration"])
         .help(SHORT)

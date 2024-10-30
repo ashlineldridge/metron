@@ -1,4 +1,4 @@
-use crate::run;
+use crate::test;
 
 const ABOUT: &str = "\
 Metron is a modern load testing toolchain.
@@ -31,7 +31,7 @@ pub fn command() -> clap::Command {
         .override_usage(USAGE)
         .help_template(HELP_TEMPLATE)
         .subcommand_required(true)
-        .subcommands([run::command()])
+        .subcommands([test::command()])
 }
 
 #[cfg(test)]

@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct RunConfig {
+pub struct TestConfig {
     pub agent: AgentConfig,
     pub plan: Plan,
 }
@@ -101,48 +101,3 @@ impl From<LogLevel> for tracing_core::LevelFilter {
         }
     }
 }
-
-// #[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
-// #[serde(rename_all = "lowercase")]
-// pub enum SignallerKind {
-//     Dedicated,
-//     Cooperative,
-// }
-
-// ---> Old stuff below.
-
-// #[derive(Clone, Debug, Deserialize, Serialize)]
-// pub struct RunConfig {
-//     pub port: Option<u16>,
-
-//     // Typical path through which a local runner is registered.
-//     pub local_runner: Option<RunnerConfig>,
-
-//     pub remote_runners: Vec<RunnerRef>,
-
-//     pub telemetry: TelemetryConfig,
-//     pub tests: Vec<TestConfig>,
-// }
-
-// #[derive(Clone, Debug, Deserialize, Serialize)]
-// #[serde(tag = "kind", rename_all = "lowercase")]
-// pub enum RunnerRef {
-//     Static {
-//         address: Url,
-//     },
-//     Kubernetes {
-//         namespace: String,
-//         selector: HashMap<String, String>,
-//         port: u16,
-//     },
-//     // Later on:
-//     // AwsEcs { ... },
-//     // GoogleCloudRun { ... },
-// }
-
-// #[derive(Clone, Debug, Deserialize, Serialize)]
-// pub struct RunnerConfig {
-//     pub name: String,
-//     pub signaller: SignallerKind,
-//     pub worker_threads: usize,
-// }

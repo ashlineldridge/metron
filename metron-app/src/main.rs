@@ -4,20 +4,21 @@ use std::env;
 
 use anyhow::Result;
 use metron_app::{parse, ParsedCli};
-use metron_config::RunConfig;
+use metron_config::TestConfig;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let parsed_config = parse(env::args_os())?;
     match parsed_config {
-        ParsedCli::Run(config) => run(&config).await?,
+        ParsedCli::Test(config) => run(&config).await?,
+        ParsedCli::Agent(_config) => todo!(),
         ParsedCli::Help(text) => println!("{text}"),
     }
 
     Ok(())
 }
 
-async fn run(_config: &RunConfig) -> Result<()> {
+async fn run(_config: &TestConfig) -> Result<()> {
     // if let Some(runner) = &config.local_runner {}
     // let mut remote_runners = Vec::with_capacity(config.remote_runners.len());
     // for r in &config.remote_runners {
