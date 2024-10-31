@@ -2,10 +2,7 @@
 
 use anyhow::Result;
 use clap::Parser;
-use metron_app::{
-    cli::{Cli, Command},
-    experimental,
-};
+use metron_app::cli::{Cli, Command};
 use metron_config::{AgentConfig, PollConfig, TestConfig};
 use tracing::info;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
@@ -20,9 +17,6 @@ async fn main() -> Result<()> {
         Command::Test { config } => run_test(config).await?,
         Command::Agent { config } => run_agent(config).await?,
         Command::Poll { config } => run_poll(config).await?,
-        Command::Experimental(experimental::Command::Generate {}) => {
-            experimental::print_example_configs_as_yaml()?;
-        }
     }
 
     Ok(())

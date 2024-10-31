@@ -1,19 +1,10 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use clap::Subcommand;
 use metron_config::*;
 use metron_core::Plan;
 
-#[derive(Clone, Debug, Subcommand)]
-pub enum Command {
-    /// Generate example configuration files
-    Generate {
-        // Can put args in here to print specific types, write to a directory, etc.
-    },
-}
-
-pub fn print_example_configs_as_yaml() -> Result<()> {
+fn main() -> Result<()> {
     let config = TestConfig {
         agent: AgentConfig {
             name: "local-agent".to_owned(),
