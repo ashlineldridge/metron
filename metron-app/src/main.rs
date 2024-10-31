@@ -2,8 +2,8 @@
 
 use anyhow::Result;
 use clap::Parser;
-use metron_app::cli::{Cli, Command};
-use metron_config::{AgentConfig, ProxyConfig, ReportConfig, StopConfig, TestConfig};
+use metron_app::cli::{AgentCommand, Cli, Command};
+use metron_config::*;
 use tracing::info;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
@@ -14,11 +14,14 @@ async fn main() -> Result<()> {
 
     let cli = Cli::parse();
     match cli.command {
-        Command::Test { config } => run_test(config).await?,
-        Command::Agent { config } => run_agent(config).await?,
-        Command::Stop { config } => run_stop(config).await?,
-        Command::Report { config } => run_report(config).await?,
-        Command::Proxy { config } => run_proxy(config).await?,
+        Command::Test { config } => run_local_test(config).await?,
+        Command::Agent { command } => match command {
+            AgentCommand::Run { config } => run_agent_server(config).await?,
+            AgentCommand::Test { config } => run_remote_test(config).await?,
+            AgentCommand::Cancel { config } => cancel_remote_test(config).await?,
+            AgentCommand::Report { config } => report_remote_test(config).await?,
+            AgentCommand::Proxy { config } => run_proxy_server(config).await?,
+        },
     }
 
     Ok(())
@@ -33,27 +36,32 @@ fn init_tracing() -> Result<()> {
     Ok(())
 }
 
-async fn run_test(config: TestConfig) -> Result<()> {
-    info!("running test with config: {:?}", config);
+async fn run_local_test(config: LocalTestConfig) -> Result<()> {
+    info!("running local test with config: {:?}", config);
     Ok(())
 }
 
-async fn run_agent(config: AgentConfig) -> Result<()> {
+async fn run_remote_test(config: RemoteTestConfig) -> Result<()> {
+    info!("running remote test with config: {:?}", config);
+    Ok(())
+}
+
+async fn run_agent_server(config: AgentConfig) -> Result<()> {
     info!("running agent with config: {:?}", config);
     Ok(())
 }
 
-async fn run_stop(config: StopConfig) -> Result<()> {
+async fn run_proxy_server(config: ProxyConfig) -> Result<()> {
+    info!("running proxy with config: {:?}", config);
+    Ok(())
+}
+
+async fn cancel_remote_test(config: CancelConfig) -> Result<()> {
     info!("running stop with config: {:?}", config);
     Ok(())
 }
 
-async fn run_report(config: ReportConfig) -> Result<()> {
+async fn report_remote_test(config: ReportConfig) -> Result<()> {
     info!("running report with config: {:?}", config);
-    Ok(())
-}
-
-async fn run_proxy(config: ProxyConfig) -> Result<()> {
-    info!("running proxy with config: {:?}", config);
     Ok(())
 }

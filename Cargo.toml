@@ -16,6 +16,7 @@ either             = "1.13.0"
 futures-core       = "0.3.31"
 humantime          = "2.1.0"
 humantime-serde    = "1.1.1"
+num_cpus           = "1.16.0"
 prost              = "0.13.3"
 prost-types        = "0.13.3"
 serde              = { version = "1.0.214", features = ["derive"] }

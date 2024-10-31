@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use metron_config::{AgentConfig, ProxyConfig, ReportConfig, StopConfig, TestConfig};
+use metron_config::*;
 use serde::de::DeserializeOwned;
 
 #[derive(Debug, Parser)]
@@ -11,32 +11,46 @@ pub struct Cli {
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
-    // TODO: Can make these tuple types?
-    /// Run a load test
+    /// Run a local load test
     Test {
         /// Test config file (use '-' for stdin)
-        #[arg(short = 'f', long = "file", value_parser = config_file::<TestConfig>, value_name = "FILE")]
-        config: TestConfig,
+        #[arg(short = 'f', long = "file", value_parser = config_file::<LocalTestConfig>, value_name = "FILE")]
+        config: LocalTestConfig,
     },
-    /// Run an agent server
+    /// Run agent commands
     Agent {
+        #[command(subcommand)]
+        command: AgentCommand,
+    },
+}
+
+#[derive(Clone, Debug, Subcommand)]
+pub enum AgentCommand {
+    /// Run an agent server
+    Run {
         /// Agent config file (use '-' for stdin)
         #[arg(short = 'f', long = "file", value_parser = config_file::<AgentConfig>, value_name = "FILE")]
         config: AgentConfig,
     },
-    /// Stop a load test (running on agents)
-    Stop {
-        /// Stop config file (use '-' for stdin)
-        #[arg(short = 'f', long = "file", value_parser = config_file::<StopConfig>, value_name = "FILE")]
-        config: StopConfig,
+    /// Run a remote load test
+    Test {
+        /// Test config file (use '-' for stdin)
+        #[arg(short = 'f', long = "file", value_parser = config_file::<RemoteTestConfig>, value_name = "FILE")]
+        config: RemoteTestConfig,
     },
-    /// Print a report of test results (retrieved from agents)
+    /// Cancel a remote load test
+    Cancel {
+        /// Stop config file (use '-' for stdin)
+        #[arg(short = 'f', long = "file", value_parser = config_file::<CancelConfig>, value_name = "FILE")]
+        config: CancelConfig,
+    },
+    /// Print a test report
     Report {
         /// Report config file (use '-' for stdin)
         #[arg(short = 'f', long = "file", value_parser = config_file::<ReportConfig>, value_name = "FILE")]
         config: ReportConfig,
     },
-    /// Run a proxy server (to balance load between agents)
+    /// Run an agent proxy server
     Proxy {
         /// Proxy config file (use '-' for stdin)
         #[arg(short = 'f', long = "file", value_parser = config_file::<ProxyConfig>, value_name = "FILE")]

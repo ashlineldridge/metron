@@ -1,0 +1,17 @@
+name: remote-0
+signaller: dedicated
+worker_threads: 12
+logging:
+  level: debug
+  format: bunyan
+prometheus:
+  port: 8081
+  path: /metrics
+open_telemetry:
+  address: http://localhost:8989/
+  period:
+    secs: 60
+    nanos: 0
+  timeout:
+    secs: 60
+    nanos: 0

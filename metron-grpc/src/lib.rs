@@ -127,11 +127,11 @@ where
         Ok(Response::new(proto::TestResponse {}))
     }
 
-    async fn stop(
+    async fn cancel(
         &self,
-        _request: Request<proto::StopRequest>,
-    ) -> Result<Response<proto::StopResponse>, Status> {
-        Ok(Response::new(proto::StopResponse {}))
+        _request: Request<proto::CancelRequest>,
+    ) -> Result<Response<proto::CancelResponse>, Status> {
+        Ok(Response::new(proto::CancelResponse {}))
     }
 
     async fn report(

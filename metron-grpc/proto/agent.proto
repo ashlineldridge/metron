@@ -11,8 +11,8 @@ package proto;
 service Agent {
   // Runs a load test (replacing any currently running test).
   rpc Test(TestRequest) returns (TestResponse);
-  // Stops any running test.
-  rpc Stop(StopRequest) returns (StopResponse);
+  // Cancel any running test.
+  rpc Cancel(CancelRequest) returns (CancelResponse);
   // Returns a report of test results.
   rpc Report(ReportRequest) returns (ReportResponse);
   // Establishes a proxy stream (used to balance load over multiple agents).
@@ -36,9 +36,9 @@ message ProxyRequest {
 
 message ProxyResponse {}
 
-message StopRequest {}
+message CancelRequest {}
 
-message StopResponse {}
+message CancelResponse {}
 
 message ReportRequest {
   google.protobuf.Duration duration = 1;

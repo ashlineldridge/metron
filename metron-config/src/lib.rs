@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{collections::HashMap, time::Duration};
 
 use clap::ValueEnum;
 use metron_core::Plan;
@@ -6,34 +6,44 @@ use serde::{Deserialize, Serialize};
 use url::Url;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct TestConfig {
-    pub agent: AgentConfig,
+pub struct LocalTestConfig {
     pub plan: Plan,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct StopConfig {
-    pub agents: Vec<AgentDiscovery>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct AgentConfig {
-    pub name: String,
-    pub signaller: SignallerKind,
-    pub worker_threads: usize,
-    pub logging: LoggingConfig,
+    pub signaller: Option<SignallerKind>,
+    pub worker_threads: Option<usize>,
+    pub logging: Option<LoggingConfig>,
     pub prometheus: Option<PrometheusConfig>,
     pub open_telemetry: Option<OpenTelemetryConfig>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RemoteTestConfig {
+    pub plan: Plan,
+    pub agents: Vec<RemoteAgentDiscovery>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AgentConfig {
+    pub name: Option<String>,
+    pub signaller: Option<SignallerKind>,
+    pub worker_threads: Option<usize>,
+    pub logging: Option<LoggingConfig>,
+    pub prometheus: Option<PrometheusConfig>,
+    pub open_telemetry: Option<OpenTelemetryConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct CancelConfig {
+    pub agents: Vec<RemoteAgentDiscovery>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ReportConfig {
-    pub agents: Vec<AgentDiscovery>,
+    pub agents: Vec<RemoteAgentDiscovery>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProxyConfig {
-    pub agents: Vec<AgentDiscovery>,
+    pub agents: Vec<RemoteAgentDiscovery>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
@@ -43,11 +53,38 @@ pub enum SignallerKind {
     Cooperative,
 }
 
+impl Default for SignallerKind {
+    fn default() -> Self {
+        Self::Dedicated
+    }
+}
+
+impl From<SignallerKind> for metron_core::SignallerKind {
+    fn from(kind: SignallerKind) -> Self {
+        match kind {
+            SignallerKind::Dedicated => metron_core::SignallerKind::Dedicated,
+            SignallerKind::Cooperative => metron_core::SignallerKind::Cooperative,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(tag = "kind", rename_all = "lowercase")]
-pub enum AgentDiscovery {
-    Static { endpoints: Vec<String> },
-    DnsRecord { refresh: Duration, dns_name: String },
+#[serde(tag = "type", rename_all = "lowercase", content = "spec")]
+pub enum RemoteAgentDiscovery {
+    Static(StaticAgentDiscovery),
+    KubePod(KubePodAgentDiscovery),
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct StaticAgentDiscovery {
+    pub endpoints: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct KubePodAgentDiscovery {
+    pub match_labels: HashMap<String, String>,
+    pub port: u16,
+    pub refresh: Duration,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

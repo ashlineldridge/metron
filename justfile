@@ -12,3 +12,6 @@ clean:
 
 test:
     cargo test
+
+gen:
+    cargo run --example gen -- ./examples

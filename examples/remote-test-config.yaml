@@ -1,0 +1,9 @@
+plan:
+  segments: []
+  actions: []
+agents:
+- type: static
+  spec:
+    endpoints:
+    - 198.120.113.0:8080
+    - foo.bar.com:8080
