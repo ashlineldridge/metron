@@ -1,0 +1,25 @@
+agent:
+  name: local-agent
+  signaller: dedicated
+  worker_threads: 8
+  logging:
+    level: debug
+    format: bunyan
+  prometheus:
+    port: 8081
+    path: /metrics
+  open_telemetry:
+    address: http://localhost:8989/
+    period:
+      secs: 60
+      nanos: 0
+    timeout:
+      secs: 60
+      nanos: 0
+  proxy:
+  - kind: static
+    endpoints:
+    - 127.0.0.1:8585
+plan:
+  segments: []
+  actions: []

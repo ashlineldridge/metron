@@ -1,31 +1,32 @@
 [workspace]
-resolver = "2"
 members = [
   "metron-app",
   "metron-config",
   "metron-core",  
   "metron-grpc",
 ]
+resolver = "2"
 
 [workspace.dependencies]
-anyhow          = "1.0.91"
-async-stream    = "0.3.6"
-async-trait     = "0.1.83"
-clap            = { version = "4.5.20", features = ["cargo", "derive"]}
-either          = "1.13.0"
-futures-core    = "0.3.31"
-humantime       = "2.1.0"
-humantime-serde = "1.1.1"
-prost           = "0.13.3"
-prost-types     = "0.13.3"
-serde           = { version = "1.0.214", features = ["derive"] }
-serde_yaml      = "0.9.34"
-thiserror       = "1.0.65"
-tokio           = { version = "1.41.0", features = ["full"] }
-tokio-stream    = "0.1.16"
-tonic           = "0.12.3"
-tonic-build     = "0.12.3"
-tower           = { version = "0.5.1", features = ["discover", "ready-cache"] }
-tracing         = "0.1.40"
-tracing-core    = "0.1.32"
-url             = { version = "2.5.2", features = ["serde"] }
+anyhow             = "1.0.91"
+async-stream       = "0.3.6"
+async-trait        = "0.1.83"
+clap               = { version = "4.5.20", features = ["cargo", "derive"] }
+either             = "1.13.0"
+futures-core       = "0.3.31"
+humantime          = "2.1.0"
+humantime-serde    = "1.1.1"
+prost              = "0.13.3"
+prost-types        = "0.13.3"
+serde              = { version = "1.0.214", features = ["derive"] }
+serde_yaml         = "0.9.34"
+thiserror          = "1.0.65"
+tokio              = { version = "1.41.0", features = ["full"] }
+tokio-stream       = "0.1.16"
+tonic              = "0.12.3"
+tonic-build        = "0.12.3"
+tower              = { version = "0.5.1", features = ["discover", "ready-cache"] }
+tracing            = "0.1.40"
+tracing-core       = "0.1.32"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+url                = { version = "2.5.2", features = ["serde"] }

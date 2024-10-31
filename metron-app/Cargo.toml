@@ -9,16 +9,17 @@ name = "metron"
 path = "src/main.rs"
 
 [dependencies]
-anyhow.workspace       = true
-clap.workspace         = true
-either.workspace       = true
-humantime.workspace    = true
-metron-config          = { path = "../metron-config" }
-metron-core            = { path = "../metron-core" }
-serde.workspace        = true
-serde_yaml.workspace   = true
-thiserror.workspace    = true
-tokio.workspace        = true
-tracing-core.workspace = true
-tracing.workspace      = true
-url.workspace          = true
+anyhow.workspace             = true
+clap.workspace               = true
+either.workspace             = true
+humantime.workspace          = true
+metron-config                = { path = "../metron-config" }
+metron-core                  = { path = "../metron-core" }
+serde.workspace              = true
+serde_yaml.workspace         = true
+thiserror.workspace          = true
+tokio.workspace              = true
+tracing-core.workspace       = true
+tracing-subscriber.workspace = true
+tracing.workspace            = true
+url.workspace                = true

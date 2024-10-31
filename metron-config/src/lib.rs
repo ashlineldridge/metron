@@ -19,8 +19,12 @@ pub struct AgentConfig {
     pub logging: LoggingConfig,
     pub prometheus: Option<PrometheusConfig>,
     pub open_telemetry: Option<OpenTelemetryConfig>,
-    pub file_output: Option<FileOutputConfig>,
     pub proxy: Vec<AgentDiscovery>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PollConfig {
+    pub agents: Vec<AgentDiscovery>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, ValueEnum)]
@@ -33,7 +37,7 @@ pub enum SignallerKind {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum AgentDiscovery {
-    Static { ip_addresses: Vec<String> },
+    Static { endpoints: Vec<String> },
     DnsRecord { refresh: Duration, dns_name: String },
 }
 
@@ -48,11 +52,6 @@ pub struct OpenTelemetryConfig {
     pub address: Url,
     pub period: Duration,
     pub timeout: Duration,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct FileOutputConfig {
-    pub path: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
