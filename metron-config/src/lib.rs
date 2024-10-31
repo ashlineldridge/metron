@@ -12,6 +12,11 @@ pub struct TestConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct StopConfig {
+    pub agents: Vec<AgentDiscovery>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AgentConfig {
     pub name: String,
     pub signaller: SignallerKind,
@@ -19,11 +24,15 @@ pub struct AgentConfig {
     pub logging: LoggingConfig,
     pub prometheus: Option<PrometheusConfig>,
     pub open_telemetry: Option<OpenTelemetryConfig>,
-    pub proxy: Vec<AgentDiscovery>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct PollConfig {
+pub struct ReportConfig {
+    pub agents: Vec<AgentDiscovery>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ProxyConfig {
     pub agents: Vec<AgentDiscovery>,
 }
 

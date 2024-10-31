@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use metron_config::{AgentConfig, PollConfig, TestConfig};
+use metron_config::{AgentConfig, ProxyConfig, ReportConfig, StopConfig, TestConfig};
 use serde::de::DeserializeOwned;
 
 #[derive(Debug, Parser)]
@@ -18,17 +18,29 @@ pub enum Command {
         #[arg(short = 'f', long = "file", value_parser = config_file::<TestConfig>, value_name = "FILE")]
         config: TestConfig,
     },
-    /// Run an agent
+    /// Run an agent server
     Agent {
         /// Agent config file (use '-' for stdin)
         #[arg(short = 'f', long = "file", value_parser = config_file::<AgentConfig>, value_name = "FILE")]
         config: AgentConfig,
     },
-    /// Poll the results of a load test
-    Poll {
-        /// Poll config file (use '-' for stdin)
-        #[arg(short = 'f', long = "file", value_parser = config_file::<PollConfig>, value_name = "FILE")]
-        config: PollConfig,
+    /// Stop a load test (running on agents)
+    Stop {
+        /// Stop config file (use '-' for stdin)
+        #[arg(short = 'f', long = "file", value_parser = config_file::<StopConfig>, value_name = "FILE")]
+        config: StopConfig,
+    },
+    /// Print a report of test results (retrieved from agents)
+    Report {
+        /// Report config file (use '-' for stdin)
+        #[arg(short = 'f', long = "file", value_parser = config_file::<ReportConfig>, value_name = "FILE")]
+        config: ReportConfig,
+    },
+    /// Run a proxy server (to balance load between agents)
+    Proxy {
+        /// Proxy config file (use '-' for stdin)
+        #[arg(short = 'f', long = "file", value_parser = config_file::<ProxyConfig>, value_name = "FILE")]
+        config: ProxyConfig,
     },
 }
 

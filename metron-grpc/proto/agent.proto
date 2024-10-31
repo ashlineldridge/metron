@@ -9,38 +9,42 @@ package proto;
 // Agent Service
 
 service Agent {
-  rpc Run(RunRequest) returns (RunResponse);
-  rpc Control(stream ControlRequest) returns (stream ControlResponse);
+  // Runs a load test (replacing any currently running test).
+  rpc Test(TestRequest) returns (TestResponse);
+  // Stops any running test.
   rpc Stop(StopRequest) returns (StopResponse);
-  rpc Poll(PollRequest) returns (PollResponse);
+  // Returns a report of test results.
+  rpc Report(ReportRequest) returns (ReportResponse);
+  // Establishes a proxy stream (used to balance load over multiple agents).
+  rpc Proxy(stream ProxyRequest) returns (stream ProxyResponse);
 }
 
 // ----------------------------------------------------------------------------
 // RPC Requests & Responses
 
-message RunRequest {
+message TestRequest {
   Plan plan = 1;
   google.protobuf.Timestamp start_time = 2;
 }
 
-message RunResponse {}
+message TestResponse {}
 
-message ControlRequest {
+message ProxyRequest {
   Plan plan = 1;
   google.protobuf.Timestamp start_time = 2;
 }
 
-message ControlResponse {}
+message ProxyResponse {}
 
 message StopRequest {}
 
 message StopResponse {}
 
-message PollRequest {
+message ReportRequest {
   google.protobuf.Duration duration = 1;
 }
 
-message PollResponse {
+message ReportResponse {
   PollStats stats = 1;
 }
 
@@ -124,6 +128,6 @@ message WasmAction {
 }
 
 // ----------------------------------------------------------------------------
-// Poll Statistics
+// Report Statistics
 
 message PollStats {}

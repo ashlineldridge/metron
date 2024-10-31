@@ -3,7 +3,7 @@
 use anyhow::Result;
 use clap::Parser;
 use metron_app::cli::{Cli, Command};
-use metron_config::{AgentConfig, PollConfig, TestConfig};
+use metron_config::{AgentConfig, ProxyConfig, ReportConfig, StopConfig, TestConfig};
 use tracing::info;
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
@@ -16,7 +16,9 @@ async fn main() -> Result<()> {
     match cli.command {
         Command::Test { config } => run_test(config).await?,
         Command::Agent { config } => run_agent(config).await?,
-        Command::Poll { config } => run_poll(config).await?,
+        Command::Stop { config } => run_stop(config).await?,
+        Command::Report { config } => run_report(config).await?,
+        Command::Proxy { config } => run_proxy(config).await?,
     }
 
     Ok(())
@@ -41,7 +43,17 @@ async fn run_agent(config: AgentConfig) -> Result<()> {
     Ok(())
 }
 
-async fn run_poll(config: PollConfig) -> Result<()> {
-    info!("running poll with config: {:?}", config);
+async fn run_stop(config: StopConfig) -> Result<()> {
+    info!("running stop with config: {:?}", config);
+    Ok(())
+}
+
+async fn run_report(config: ReportConfig) -> Result<()> {
+    info!("running report with config: {:?}", config);
+    Ok(())
+}
+
+async fn run_proxy(config: ProxyConfig) -> Result<()> {
+    info!("running proxy with config: {:?}", config);
     Ok(())
 }

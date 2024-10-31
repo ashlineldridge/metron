@@ -32,7 +32,7 @@ impl AgentClient {
             loop {
                 interval.tick().await;
 
-                let request = proto::ControlRequest {
+                let request = proto::ProxyRequest {
                     plan: Some(proto::Plan {
                         segments: vec![],
                         actions: vec![],
@@ -45,7 +45,7 @@ impl AgentClient {
         };
 
         // TODO: Remove unwraps.
-        let response = self.inner.control(Request::new(outbound)).await?;
+        let response = self.inner.proxy(Request::new(outbound)).await?;
         let mut inbound = response.into_inner();
 
         while let Some(res) = inbound.message().await? {
@@ -117,20 +117,34 @@ where
     S::Error: std::fmt::Debug,
     S::Future: Send + 'static,
 {
-    type ControlStream =
-        Pin<Box<dyn Stream<Item = Result<proto::ControlResponse, tonic::Status>> + Send + 'static>>;
+    type ProxyStream =
+        Pin<Box<dyn Stream<Item = Result<proto::ProxyResponse, tonic::Status>> + Send + 'static>>;
 
-    async fn run(
+    async fn test(
         &self,
-        _request: Request<proto::RunRequest>,
-    ) -> Result<Response<proto::RunResponse>, Status> {
-        Ok(Response::new(proto::RunResponse {}))
+        _request: Request<proto::TestRequest>,
+    ) -> Result<Response<proto::TestResponse>, Status> {
+        Ok(Response::new(proto::TestResponse {}))
     }
 
-    async fn control(
+    async fn stop(
         &self,
-        request: Request<Streaming<proto::ControlRequest>>,
-    ) -> Result<Response<Self::ControlStream>, tonic::Status> {
+        _request: Request<proto::StopRequest>,
+    ) -> Result<Response<proto::StopResponse>, Status> {
+        Ok(Response::new(proto::StopResponse {}))
+    }
+
+    async fn report(
+        &self,
+        _request: Request<proto::ReportRequest>,
+    ) -> Result<Response<proto::ReportResponse>, tonic::Status> {
+        Ok(Response::new(proto::ReportResponse { stats: None }))
+    }
+
+    async fn proxy(
+        &self,
+        request: Request<Streaming<proto::ProxyRequest>>,
+    ) -> Result<Response<Self::ProxyStream>, tonic::Status> {
         let mut stream = request.into_inner();
 
         let mut inner = self.inner.clone();
@@ -143,25 +157,11 @@ where
 
                 inner.call(plan).await.expect("service call failed");
 
-                yield proto::ControlResponse { };
+                yield proto::ProxyResponse { };
             }
         };
 
-        Ok(Response::new(Box::pin(output) as Self::ControlStream))
-    }
-
-    async fn stop(
-        &self,
-        _request: Request<proto::StopRequest>,
-    ) -> Result<Response<proto::StopResponse>, Status> {
-        Ok(Response::new(proto::StopResponse {}))
-    }
-
-    async fn poll(
-        &self,
-        _request: Request<proto::PollRequest>,
-    ) -> Result<Response<proto::PollResponse>, tonic::Status> {
-        Ok(Response::new(proto::PollResponse { stats: None }))
+        Ok(Response::new(Box::pin(output) as Self::ProxyStream))
     }
 }
 
