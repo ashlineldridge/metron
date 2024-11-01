@@ -7,6 +7,15 @@ use tonic::{Request, Response, Status, Streaming};
 
 use crate::proto;
 
+#[derive(Error, Debug)]
+pub enum AgentServerError {
+    #[error(transparent)]
+    TransportError(#[from] tonic::transport::Error),
+
+    #[error(transparent)]
+    Unexpected(#[from] anyhow::Error),
+}
+
 #[derive(Clone)]
 pub struct AgentServer<T> {
     agent: T,
@@ -15,7 +24,7 @@ pub struct AgentServer<T> {
 
 impl<T> AgentServer<T>
 where
-    T: Agent + Clone + Send + Sync + 'static,
+    T: Agent + Send + Sync + 'static,
 {
     pub fn new(agent: T, port: u16) -> Self {
         Self { agent, port }
@@ -41,7 +50,7 @@ where
 #[tonic::async_trait]
 impl<T> proto::agent_server::Agent for AgentServer<T>
 where
-    T: Agent + Clone + Send + Sync + 'static,
+    T: Agent + Send + Sync + 'static,
 {
     type ProxyStream =
         Pin<Box<dyn Stream<Item = Result<proto::ProxyResponse, tonic::Status>> + Send + 'static>>;
@@ -56,9 +65,7 @@ where
             .try_into()
             .map_err(|_| Status::invalid_argument("invalid plan"))?;
 
-        // TODO: Should I be cloning this?
-        let mut agent = self.agent.clone();
-        agent
+        self.agent
             .test(&plan)
             .await
             .map_err(|_| Status::internal("agent error"))?;
@@ -70,8 +77,7 @@ where
         &self,
         _request: Request<proto::CancelRequest>,
     ) -> Result<Response<proto::CancelResponse>, Status> {
-        let mut agent = self.agent.clone();
-        agent
+        self.agent
             .cancel()
             .await
             .map_err(|_| Status::internal("agent error"))?;
@@ -82,8 +88,8 @@ where
         &self,
         _request: Request<proto::ReportRequest>,
     ) -> Result<Response<proto::ReportResponse>, tonic::Status> {
-        let mut agent = self.agent.clone();
-        let _report = agent
+        let _report = self
+            .agent
             .report()
             .await
             .map_err(|_| Status::internal("agent error"))?;
@@ -112,18 +118,4 @@ where
 
         Ok(Response::new(Box::pin(output) as Self::ProxyStream))
     }
-}
-
-// TODO: Can write a From to convert to a gRPC status used above
-
-#[derive(Error, Debug)]
-pub enum AgentServerError {
-    #[error(transparent)]
-    TransportError(#[from] tonic::transport::Error),
-
-    #[error(transparent)]
-    StatusError(#[from] tonic::Status),
-
-    #[error(transparent)]
-    Unexpected(#[from] anyhow::Error),
 }

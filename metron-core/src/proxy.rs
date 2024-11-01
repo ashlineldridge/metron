@@ -1,47 +1,27 @@
-use std::{future::Future, pin::Pin, task::Poll};
-
-use tower::Service;
+use tower::discover::Discover;
 
 use crate::{Agent, AgentError, Plan, Report};
 
 #[derive(Clone)]
 #[allow(unused)]
 pub struct Proxy<D> {
+    name: String,
     discover: D,
 }
 
-impl<D: Send> Agent for Proxy<D> {
-    async fn test(&mut self, _plan: &Plan) -> Result<(), AgentError> {
-        Ok(())
-    }
-
-    async fn cancel(&mut self) -> Result<(), AgentError> {
-        Ok(())
-    }
-
-    async fn report(&mut self) -> Result<Report, AgentError> {
-        Ok(Report {})
-    }
-
-    async fn proxy(&mut self) -> Result<Report, AgentError> {
-        Ok(Report {})
-    }
-}
-
 impl<D> Proxy<D>
-// where
-//     D: Discover + Clone,
-//     D::Key: Hash,
-//     D::Service: Service<Plan> + Clone + Send + Sync + 'static,
-//     <D::Service as Service<Plan>>::Response: Send + Sync + 'static,
-//     <D::Service as Service<Plan>>::Error: std::error::Error + Send + Sync + 'static,
-//     <D::Service as Service<Plan>>::Future: Send + 'static,
+where
+    D: Discover,
+    D::Service: Agent,
+    //     <D::Service as Service<Plan>>::Response: Send + Sync + 'static,
+    //     <D::Service as Service<Plan>>::Error: std::error::Error + Send + Sync + 'static,
+    //     <D::Service as Service<Plan>>::Future: Send + 'static,
 {
-    pub fn new(discover: D) -> Self {
-        Self { discover }
+    pub fn new(name: String, discover: D) -> Self {
+        Self { name, discover }
     }
 
-    pub async fn run(&self, _plan: &Plan) -> Result<(), AgentError> {
+    pub async fn run(&self) -> Result<(), AgentError> {
         // let mut balancer = Balance::new(self.discover.clone());
 
         // let requests = (1..10)
@@ -74,40 +54,58 @@ impl<D> Proxy<D>
     }
 }
 
-// For now, the Controller just gives the same plan to all runners.
-impl<S> Service<Plan> for Proxy<S>
-where
-    S: Service<Plan> + Clone + Send + Sync + 'static,
-    S::Response: Send + Sync + 'static,
-    S::Error: std::error::Error + Send + Sync + 'static,
-    S::Future: Send + 'static,
-{
-    type Response = ();
-    type Error = AgentError;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(
-        &mut self,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
-        // let mut dead = 0;
-        // for s in &mut self.agents {
-        //     match s.poll_ready(cx) {
-        //         Poll::Ready(Ok(_)) => return Poll::Ready(Ok(())),
-        //         Poll::Ready(Err(_)) => dead += 1,
-        //         _ => continue,
-        //     }
-        // }
-
-        // if dead == self.agents.len() {
-        //     return Poll::Ready(Err(anyhow!("all agents have terminally failed").into()));
-        // }
-
-        Poll::Pending
+impl<D: Send + Sync> Agent for Proxy<D> {
+    async fn test(&self, _plan: &Plan) -> Result<(), AgentError> {
+        Ok(())
     }
 
-    fn call(&mut self, req: Plan) -> Self::Future {
-        let agent = self.clone();
-        Box::pin(async move { agent.run(&req).await })
+    async fn cancel(&self) -> Result<(), AgentError> {
+        Ok(())
+    }
+
+    async fn report(&self) -> Result<Report, AgentError> {
+        Ok(Report {})
+    }
+
+    async fn proxy(&self) -> Result<Report, AgentError> {
+        Ok(Report {})
     }
 }
+
+// For now, the Controller just gives the same plan to all runners.
+// impl<S> Service<Plan> for Proxy<S>
+// where
+//     S: Service<Plan> + Clone + Send + Sync + 'static,
+//     S::Response: Send + Sync + 'static,
+//     S::Error: std::error::Error + Send + Sync + 'static,
+//     S::Future: Send + 'static,
+// {
+//     type Response = ();
+//     type Error = AgentError;
+//     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+//     fn poll_ready(
+//         &mut self,
+//         _cx: &mut std::task::Context<'_>,
+//     ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
+//         // let mut dead = 0;
+//         // for s in &mut self.agents {
+//         //     match s.poll_ready(cx) {
+//         //         Poll::Ready(Ok(_)) => return Poll::Ready(Ok(())),
+//         //         Poll::Ready(Err(_)) => dead += 1,
+//         //         _ => continue,
+//         //     }
+//         // }
+
+//         // if dead == self.agents.len() {
+//         //     return Poll::Ready(Err(anyhow!("all agents have terminally failed").into()));
+//         // }
+
+//         Poll::Pending
+//     }
+
+//     fn call(&mut self, req: Plan) -> Self::Future {
+//         let agent = self.clone();
+//         Box::pin(async move { agent.run(&req).await })
+//     }
+// }

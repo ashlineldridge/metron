@@ -1,11 +1,26 @@
-use metron_core::{Plan, Report};
+use std::{future::Future, pin::Pin, task::Poll};
+
+use metron_core::{Agent, AgentError, Plan, Report};
 use thiserror::Error;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio_stream::{wrappers::ReceiverStream, StreamExt};
+use tower::Service;
 
 use crate::proto;
 
-#[derive(Clone)]
+#[derive(Error, Debug)]
+pub enum AgentClientError {
+    #[error(transparent)]
+    TransportError(#[from] tonic::transport::Error),
+
+    #[error(transparent)]
+    StatusError(#[from] tonic::Status),
+
+    #[error(transparent)]
+    Unexpected(#[from] anyhow::Error),
+}
+
+// #[derive(Clone)]
 pub struct AgentClient {
     inner: proto::agent_client::AgentClient<tonic::transport::Channel>,
 }
@@ -20,22 +35,24 @@ impl AgentClient {
 const PROXY_CHAN_SIZE: usize = 1024;
 
 impl AgentClient {
-    pub async fn test(&mut self, plan: &Plan) -> Result<(), AgentClientError> {
+    pub async fn test(&self, plan: &Plan) -> Result<(), AgentClientError> {
         let plan = plan.try_into()?;
         self.inner
+            .clone()
             .test(proto::TestRequest { plan: Some(plan) })
             .await?;
         Ok(())
     }
 
-    pub async fn cancel(&mut self) -> Result<(), AgentClientError> {
-        self.inner.cancel(proto::CancelRequest {}).await?;
+    pub async fn cancel(&self) -> Result<(), AgentClientError> {
+        self.inner.clone().cancel(proto::CancelRequest {}).await?;
         Ok(())
     }
 
-    pub async fn report(&mut self) -> Result<Report, AgentClientError> {
+    pub async fn report(&self) -> Result<Report, AgentClientError> {
         let res = self
             .inner
+            .clone()
             .report(proto::ReportRequest { duration: None })
             .await?;
 
@@ -47,13 +64,13 @@ impl AgentClient {
 
     // TODO: Don't expose the proto from here. Use a domain type.
     pub async fn proxy(
-        &mut self,
+        &self,
     ) -> Result<(Sender<proto::ProxyRequest>, Receiver<proto::ProxyResponse>), AgentClientError>
     {
         let (req_tx, req_rx) = mpsc::channel(PROXY_CHAN_SIZE);
         let req_stream = ReceiverStream::new(req_rx);
 
-        let res = self.inner.proxy(req_stream).await?;
+        let res = self.inner.clone().proxy(req_stream).await?;
         let mut res_stream = res.into_inner();
         let (res_tx, res_rx) = mpsc::channel(PROXY_CHAN_SIZE);
 
@@ -73,14 +90,51 @@ impl AgentClient {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum AgentClientError {
-    #[error(transparent)]
-    TransportError(#[from] tonic::transport::Error),
+impl Agent for AgentClient {
+    async fn test(&self, plan: &Plan) -> Result<(), AgentError> {
+        self.test(plan).await?;
+        Ok(())
+    }
 
-    #[error(transparent)]
-    StatusError(#[from] tonic::Status),
+    async fn cancel(&self) -> Result<(), AgentError> {
+        self.cancel().await?;
+        Ok(())
+    }
 
-    #[error(transparent)]
-    Unexpected(#[from] anyhow::Error),
+    async fn report(&self) -> Result<Report, AgentError> {
+        let report = self.report().await?;
+        Ok(report)
+    }
+
+    async fn proxy(&self) -> Result<Report, AgentError> {
+        // TODO: Actually proxy? What is the use case here?
+        let report = self.report().await?;
+        Ok(report)
+    }
+}
+
+impl From<AgentClientError> for AgentError {
+    fn from(value: AgentClientError) -> Self {
+        AgentError::Unexpected(value.into())
+    }
+}
+
+impl Service<()> for AgentClient {
+    type Response = ();
+    type Error = AgentClientError;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(
+        &mut self,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
+        // TODO: Actually query the self.inner.
+        // "Readiness" can probably just mean that the agent is running and can be communicated with.
+        // Because the proxy request could lower, e.g., the rate.
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, _: ()) -> Self::Future {
+        Box::pin(async { Ok(()) })
+    }
 }

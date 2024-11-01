@@ -11,8 +11,8 @@ pub enum AgentError {
 }
 
 pub trait Agent {
-    fn test(&mut self, _plan: &Plan) -> impl Future<Output = Result<(), AgentError>> + Send;
-    fn cancel(&mut self) -> impl Future<Output = Result<(), AgentError>> + Send;
-    fn report(&mut self) -> impl Future<Output = Result<Report, AgentError>> + Send;
-    fn proxy(&mut self) -> impl Future<Output = Result<Report, AgentError>> + Send;
+    fn test(&self, _plan: &Plan) -> impl Future<Output = Result<(), AgentError>> + Send;
+    fn cancel(&self) -> impl Future<Output = Result<(), AgentError>> + Send;
+    fn report(&self) -> impl Future<Output = Result<Report, AgentError>> + Send;
+    fn proxy(&self) -> impl Future<Output = Result<Report, AgentError>> + Send;
 }

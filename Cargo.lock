@@ -649,6 +649,7 @@ dependencies = [
  "serde_yaml",
  "thiserror",
  "tokio",
+ "tower 0.5.1",
  "tracing",
  "tracing-core",
  "tracing-subscriber",

@@ -22,6 +22,7 @@ pub struct RemoteTestConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AgentConfig {
     pub name: Option<String>,
+    pub port: Option<u16>,
     pub signaller: Option<SignallerKind>,
     pub worker_threads: Option<usize>,
     pub logging: Option<LoggingConfig>,
@@ -40,6 +41,8 @@ pub struct ReportConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProxyConfig {
+    pub name: Option<String>,
+    pub port: Option<u16>,
     pub agents: Vec<RemoteAgentDiscovery>,
 }
 
