@@ -15,6 +15,7 @@ either.workspace             = true
 humantime.workspace          = true
 metron-config                = { path = "../metron-config" }
 metron-core                  = { path = "../metron-core" }
+metron-grpc                  = { path = "../metron-grpc" }
 serde.workspace              = true
 serde_yaml.workspace         = true
 thiserror.workspace          = true

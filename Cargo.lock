@@ -643,6 +643,7 @@ dependencies = [
  "humantime",
  "metron-config",
  "metron-core",
+ "metron-grpc",
  "num_cpus",
  "serde",
  "serde_yaml",

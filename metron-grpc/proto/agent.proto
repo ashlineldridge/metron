@@ -24,7 +24,6 @@ service Agent {
 
 message TestRequest {
   Plan plan = 1;
-  google.protobuf.Timestamp start_time = 2;
 }
 
 message TestResponse {}

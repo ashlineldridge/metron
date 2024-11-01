@@ -75,14 +75,14 @@ impl Plan {
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum Action {
     Http {
+        target: Url,
         method: HttpMethod,
         headers: Headers,
-        payload: String,
-        target: Url,
+        payload: Vec<u8>,
     },
     Udp {
-        payload: String,
         target: Url,
+        payload: Vec<u8>,
     },
     // TODO: Optionally compile in support for certain things.
     // E.g. A https://github.com/RustPython/RustPython might be nice

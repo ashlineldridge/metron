@@ -2,12 +2,30 @@ use std::{future::Future, pin::Pin, task::Poll};
 
 use tower::Service;
 
-use crate::Plan;
+use crate::{Agent, AgentError, Plan, Report};
 
 #[derive(Clone)]
 #[allow(unused)]
 pub struct Proxy<D> {
     discover: D,
+}
+
+impl<D: Send> Agent for Proxy<D> {
+    async fn test(&mut self, _plan: &Plan) -> Result<(), AgentError> {
+        Ok(())
+    }
+
+    async fn cancel(&mut self) -> Result<(), AgentError> {
+        Ok(())
+    }
+
+    async fn report(&mut self) -> Result<Report, AgentError> {
+        Ok(Report {})
+    }
+
+    async fn proxy(&mut self) -> Result<Report, AgentError> {
+        Ok(Report {})
+    }
 }
 
 impl<D> Proxy<D>
@@ -23,7 +41,7 @@ impl<D> Proxy<D>
         Self { discover }
     }
 
-    pub async fn run(&self, _plan: &Plan) -> Result<(), crate::AgentError> {
+    pub async fn run(&self, _plan: &Plan) -> Result<(), AgentError> {
         // let mut balancer = Balance::new(self.discover.clone());
 
         // let requests = (1..10)
@@ -49,7 +67,7 @@ impl<D> Proxy<D>
         //         .clone()
         //         .call(plan.clone())
         //         .await
-        //         .map_err(|e| crate::AgentError::Unexpected(e.into()))?;
+        //         .map_err(|e| AgentError::Unexpected(e.into()))?;
         // }
 
         // Ok(())
@@ -65,7 +83,7 @@ where
     S::Future: Send + 'static,
 {
     type Response = ();
-    type Error = crate::AgentError;
+    type Error = AgentError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(

@@ -1,10 +1,8 @@
+use std::future::Future;
+
 use thiserror::Error;
 
-#[derive(Clone, Copy, Debug)]
-pub enum SignallerKind {
-    Dedicated,
-    Cooperative,
-}
+use crate::{Plan, Report};
 
 #[derive(Error, Debug)]
 pub enum AgentError {
@@ -12,50 +10,9 @@ pub enum AgentError {
     Unexpected(#[from] anyhow::Error),
 }
 
-#[derive(Clone)]
-#[allow(unused)]
-pub struct Agent {
-    name: String,
-    signaller: SignallerKind,
-    worker_threads: usize,
+pub trait Agent {
+    fn test(&mut self, _plan: &Plan) -> impl Future<Output = Result<(), AgentError>> + Send;
+    fn cancel(&mut self) -> impl Future<Output = Result<(), AgentError>> + Send;
+    fn report(&mut self) -> impl Future<Output = Result<Report, AgentError>> + Send;
+    fn proxy(&mut self) -> impl Future<Output = Result<Report, AgentError>> + Send;
 }
-
-impl Agent {
-    pub fn new(name: String, signaller: SignallerKind, worker_threads: usize) -> Self {
-        Self {
-            name,
-            signaller,
-            worker_threads,
-        }
-    }
-
-    // pub async fn run(&self, plan: &Plan) -> Result<(), AgentError> {
-    //     info!("agent is executing the plan {:?}", plan);
-
-    //     Ok(())
-    // }
-}
-
-// #[allow(unused)]
-// struct AgentRequest {
-//     plan: Plan,
-//     // start_time: Option<Time>,
-// }
-
-// impl Service<Plan> for Agent {
-//     type Response = ();
-//     type Error = AgentError;
-//     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-//     fn poll_ready(
-//         &mut self,
-//         _cx: &mut std::task::Context<'_>,
-//     ) -> std::task::Poll<std::result::Result<(), Self::Error>> {
-//         Poll::Ready(Ok(()))
-//     }
-
-//     fn call(&mut self, req: Plan) -> Self::Future {
-//         let agent = self.clone();
-//         Box::pin(async move { agent.run(&req).await })
-//     }
-// }

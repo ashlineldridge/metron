@@ -12,6 +12,18 @@ use serde::ser;
 
 /// Generate example config files and save them under the top-level examples directory.
 fn main() -> Result<()> {
+    let remote_agents = vec![RemoteAgentDiscovery::Static(StaticAgentDiscovery {
+        endpoints: vec![
+            "198.120.113.0:8080".to_owned(),
+            "foo.bar.com:8080".to_owned(),
+        ],
+    })];
+    let sinks = vec![Sink::Otel(OtelSink {
+        address: url::Url::parse("http://localhost:8989")?,
+        period: Duration::from_secs(60),
+        timeout: Duration::from_secs(60),
+    })];
+
     let local_test_config = LocalTestConfig {
         plan: Plan {
             segments: vec![],
@@ -23,22 +35,8 @@ fn main() -> Result<()> {
             level: LogLevel::Debug,
             format: LogFormat::Bunyan,
         }),
-        prometheus: Some(PrometheusConfig {
-            port: 8081,
-            path: "/metrics".to_owned(),
-        }),
-        open_telemetry: Some(OpenTelemetryConfig {
-            address: url::Url::parse("http://localhost:8989")?,
-            period: Duration::from_secs(60),
-            timeout: Duration::from_secs(60),
-        }),
+        sinks: sinks.clone(),
     };
-    let remote_agents = vec![RemoteAgentDiscovery::Static(StaticAgentDiscovery {
-        endpoints: vec![
-            "198.120.113.0:8080".to_owned(),
-            "foo.bar.com:8080".to_owned(),
-        ],
-    })];
     let remote_test_config = RemoteTestConfig {
         plan: Plan {
             segments: vec![],
@@ -54,15 +52,7 @@ fn main() -> Result<()> {
             level: LogLevel::Debug,
             format: LogFormat::Bunyan,
         }),
-        prometheus: Some(PrometheusConfig {
-            port: 8081,
-            path: "/metrics".to_owned(),
-        }),
-        open_telemetry: Some(OpenTelemetryConfig {
-            address: url::Url::parse("http://localhost:8989")?,
-            period: Duration::from_secs(60),
-            timeout: Duration::from_secs(60),
-        }),
+        sinks: sinks.clone(),
     };
     let cancel_config = CancelConfig {
         agents: remote_agents.clone(),

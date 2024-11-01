@@ -1,9 +1,8 @@
 use std::{collections::HashMap, time::Duration};
 
 use clap::ValueEnum;
-use metron_core::Plan;
+pub use metron_core::{Plan, Sink};
 use serde::{Deserialize, Serialize};
-use url::Url;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct LocalTestConfig {
@@ -11,8 +10,7 @@ pub struct LocalTestConfig {
     pub signaller: Option<SignallerKind>,
     pub worker_threads: Option<usize>,
     pub logging: Option<LoggingConfig>,
-    pub prometheus: Option<PrometheusConfig>,
-    pub open_telemetry: Option<OpenTelemetryConfig>,
+    pub sinks: Vec<Sink>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -27,8 +25,7 @@ pub struct AgentConfig {
     pub signaller: Option<SignallerKind>,
     pub worker_threads: Option<usize>,
     pub logging: Option<LoggingConfig>,
-    pub prometheus: Option<PrometheusConfig>,
-    pub open_telemetry: Option<OpenTelemetryConfig>,
+    pub sinks: Vec<Sink>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -85,19 +82,6 @@ pub struct KubePodAgentDiscovery {
     pub match_labels: HashMap<String, String>,
     pub port: u16,
     pub refresh: Duration,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct PrometheusConfig {
-    pub port: u16,
-    pub path: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct OpenTelemetryConfig {
-    pub address: Url,
-    pub period: Duration,
-    pub timeout: Duration,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
