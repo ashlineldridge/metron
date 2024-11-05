@@ -3,7 +3,7 @@ use std::{net::AddrParseError, pin::Pin};
 use metron_core::Agent;
 use thiserror::Error;
 use tokio_stream::{Stream, StreamExt};
-use tonic::{Request, Response, Status, Streaming};
+use tonic::{Request, Response, Streaming};
 
 use crate::proto;
 
@@ -24,13 +24,13 @@ pub struct AgentServer<T> {
 
 impl<T> AgentServer<T>
 where
-    T: Agent + Send + Sync + 'static,
+    T: Agent + Clone + Send + Sync + 'static,
 {
     pub fn new(agent: T, port: u16) -> Self {
         Self { agent, port }
     }
 
-    pub async fn listen(self) -> Result<(), AgentServerError> {
+    pub async fn run(self) -> Result<(), AgentServerError> {
         let address = format!("[::1]:{}", self.port)
             .parse()
             .map_err(|e: AddrParseError| AgentServerError::Unexpected(e.into()))?;
@@ -50,72 +50,32 @@ where
 #[tonic::async_trait]
 impl<T> proto::agent_server::Agent for AgentServer<T>
 where
-    T: Agent + Send + Sync + 'static,
+    T: Agent + Clone + Send + Sync + 'static,
 {
-    type ProxyStream =
-        Pin<Box<dyn Stream<Item = Result<proto::ProxyResponse, tonic::Status>> + Send + 'static>>;
+    type ControlStream =
+        Pin<Box<dyn Stream<Item = Result<proto::ControlResponse, tonic::Status>> + Send + 'static>>;
 
-    async fn test(
+    async fn control(
         &self,
-        request: Request<proto::TestRequest>,
-    ) -> Result<Response<proto::TestResponse>, Status> {
-        let req = request.into_inner();
-        let plan = req.plan.ok_or(Status::invalid_argument("missing plan"))?;
-        let plan = plan
-            .try_into()
-            .map_err(|_| Status::invalid_argument("invalid plan"))?;
-
-        self.agent
-            .test(&plan)
-            .await
-            .map_err(|_| Status::internal("agent error"))?;
-
-        Ok(Response::new(proto::TestResponse {}))
-    }
-
-    async fn cancel(
-        &self,
-        _request: Request<proto::CancelRequest>,
-    ) -> Result<Response<proto::CancelResponse>, Status> {
-        self.agent
-            .cancel()
-            .await
-            .map_err(|_| Status::internal("agent error"))?;
-        Ok(Response::new(proto::CancelResponse {}))
-    }
-
-    async fn report(
-        &self,
-        _request: Request<proto::ReportRequest>,
-    ) -> Result<Response<proto::ReportResponse>, tonic::Status> {
-        let _report = self
-            .agent
-            .report()
-            .await
-            .map_err(|_| Status::internal("agent error"))?;
-        Ok(Response::new(proto::ReportResponse { stats: None }))
-    }
-
-    async fn proxy(
-        &self,
-        request: Request<Streaming<proto::ProxyRequest>>,
-    ) -> Result<Response<Self::ProxyStream>, tonic::Status> {
+        request: Request<Streaming<proto::ControlRequest>>,
+    ) -> Result<Response<Self::ControlStream>, tonic::Status> {
         let mut stream = request.into_inner();
 
-        // let mut inner = self.agent.clone();
+        let mut agent = self.agent.clone();
         let output = async_stream::try_stream! {
-            while let Some(_req) = stream.next().await {
-                // let req = req?;
-                // let plan = req.plan.ok_or_else(|| tonic::Status::invalid_argument("missing plan"))?;
-                // let plan: Plan = plan.try_into().unwrap();
-                // let _target = "TODO".to_string();
+            while let Some(req) = stream.next().await {
+                let req = req?;
+                let plan = req.plan.ok_or_else(|| tonic::Status::invalid_argument("missing plan"))?;
+                let plan = plan.try_into().unwrap();
+                // let start = req.start_time.ok_or_else(|| tonic::Status::invalid_argument("missing start time"))?;
+                // let start = start.try_into().unwrap();
 
-                // inner.call(plan).await.expect("service call failed");
+                agent.test(&plan).await.expect("service call failed");
 
-                yield proto::ProxyResponse { };
+                yield proto::ControlResponse { };
             }
         };
 
-        Ok(Response::new(Box::pin(output) as Self::ProxyStream))
+        Ok(Response::new(Box::pin(output) as Self::ControlStream))
     }
 }

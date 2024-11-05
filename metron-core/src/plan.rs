@@ -35,6 +35,13 @@ pub struct Plan {
 }
 
 impl Plan {
+    pub fn empty() -> Self {
+        Self {
+            segments: vec![],
+            actions: vec![],
+        }
+    }
+
     pub fn ticks(&self, start: Instant) -> Ticks {
         Ticks::new(self, start)
     }

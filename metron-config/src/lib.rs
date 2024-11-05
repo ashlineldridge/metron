@@ -59,11 +59,11 @@ impl Default for SignallerKind {
     }
 }
 
-impl From<SignallerKind> for metron_core::SignallerKind {
+impl From<SignallerKind> for metron_core::Signaller {
     fn from(kind: SignallerKind) -> Self {
         match kind {
-            SignallerKind::Dedicated => metron_core::SignallerKind::Dedicated,
-            SignallerKind::Cooperative => metron_core::SignallerKind::Cooperative,
+            SignallerKind::Dedicated => metron_core::Signaller::Dedicated,
+            SignallerKind::Cooperative => metron_core::Signaller::Cooperative,
         }
     }
 }

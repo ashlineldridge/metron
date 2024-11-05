@@ -21,7 +21,8 @@ where
         Self { name, discover }
     }
 
-    pub async fn run(&self) -> Result<(), AgentError> {
+    pub async fn run(&mut self) -> Result<(), AgentError> {
+        // self.discover.pol
         // let mut balancer = Balance::new(self.discover.clone());
 
         // let requests = (1..10)
@@ -61,14 +62,6 @@ impl<D: Send + Sync> Agent for Proxy<D> {
 
     async fn cancel(&self) -> Result<(), AgentError> {
         Ok(())
-    }
-
-    async fn report(&self) -> Result<Report, AgentError> {
-        Ok(Report {})
-    }
-
-    async fn proxy(&self) -> Result<Report, AgentError> {
-        Ok(Report {})
     }
 }
 

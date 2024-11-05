@@ -9,43 +9,19 @@ package proto;
 // Agent Service
 
 service Agent {
-  // Runs a load test (replacing any currently running test).
-  rpc Test(TestRequest) returns (TestResponse);
-  // Cancel any running test.
-  rpc Cancel(CancelRequest) returns (CancelResponse);
-  // Returns a report of test results.
-  rpc Report(ReportRequest) returns (ReportResponse);
-  // Establishes a proxy stream (used to balance load over multiple agents).
-  rpc Proxy(stream ProxyRequest) returns (stream ProxyResponse);
+  // Create a control stream with the agent.
+  rpc Control(stream ControlRequest) returns (stream ControlResponse);
 }
 
 // ----------------------------------------------------------------------------
 // RPC Requests & Responses
 
-message TestRequest {
-  Plan plan = 1;
-}
-
-message TestResponse {}
-
-message ProxyRequest {
+message ControlRequest {
   Plan plan = 1;
   google.protobuf.Timestamp start_time = 2;
 }
 
-message ProxyResponse {}
-
-message CancelRequest {}
-
-message CancelResponse {}
-
-message ReportRequest {
-  google.protobuf.Duration duration = 1;
-}
-
-message ReportResponse {
-  PollStats stats = 1;
-}
+message ControlResponse {}
 
 // ----------------------------------------------------------------------------
 // Test Plan
@@ -125,8 +101,3 @@ message GrpcAction {
 
 message WasmAction {
 }
-
-// ----------------------------------------------------------------------------
-// Report Statistics
-
-message PollStats {}

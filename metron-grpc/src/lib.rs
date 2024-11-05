@@ -6,8 +6,11 @@ pub(crate) mod proto {
 
 use anyhow::Context;
 pub use client::*;
-use metron_core::{Action, HttpMethod, Plan, RateSegment};
+use metron_core::{Action, HttpMethod, Plan, RateSegment, Report};
 pub use server::*;
+
+// ----------------------------------------------------------------------------
+// Test Plan
 
 impl TryFrom<Plan> for proto::Plan {
     type Error = anyhow::Error;
