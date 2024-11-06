@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::Result;
 use metron_config::*;
-use metron_core::Plan;
+use metron_core::*;
 use serde::ser;
 
 /// Generate example config files and save them under the top-level examples directory.
@@ -46,6 +46,7 @@ fn main() -> Result<()> {
     };
     let agent_config = AgentConfig {
         name: Some("remote-0".to_owned()),
+        port: Some(8989),
         signaller: Some(SignallerKind::Dedicated),
         worker_threads: Some(num_cpus::get()),
         logging: Some(LoggingConfig {
@@ -61,6 +62,8 @@ fn main() -> Result<()> {
         agents: remote_agents.clone(),
     };
     let proxy_config = ProxyConfig {
+        name: Some("proxy-0".to_owned()),
+        port: Some(8989),
         agents: remote_agents.clone(),
     };
 

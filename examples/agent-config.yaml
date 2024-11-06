@@ -1,4 +1,5 @@
 name: remote-0
+port: 8989
 signaller: dedicated
 worker_threads: 12
 logging:

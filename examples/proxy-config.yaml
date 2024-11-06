@@ -1,3 +1,5 @@
+name: proxy-0
+port: 8989
 agents:
 - type: static
   spec:
