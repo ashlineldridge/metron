@@ -1,4 +1,4 @@
-use std::{net::AddrParseError, pin::Pin};
+use std::{net::AddrParseError, pin::Pin, sync::Arc};
 
 use metron_core::Agent;
 use thiserror::Error;
@@ -18,16 +18,19 @@ pub enum AgentServerError {
 
 #[derive(Clone)]
 pub struct AgentServer<T> {
-    agent: T,
+    agent: Arc<T>,
     port: u16,
 }
 
 impl<T> AgentServer<T>
 where
-    T: Agent + Clone + Send + Sync + 'static,
+    T: Agent + Send + Sync + 'static,
 {
     pub fn new(agent: T, port: u16) -> Self {
-        Self { agent, port }
+        Self {
+            agent: Arc::new(agent),
+            port,
+        }
     }
 
     pub async fn run(self) -> Result<(), AgentServerError> {
@@ -50,7 +53,7 @@ where
 #[tonic::async_trait]
 impl<T> proto::agent_server::Agent for AgentServer<T>
 where
-    T: Agent + Clone + Send + Sync + 'static,
+    T: Agent + Send + Sync + 'static,
 {
     type ControlStream =
         Pin<Box<dyn Stream<Item = Result<proto::ControlResponse, tonic::Status>> + Send + 'static>>;
@@ -61,7 +64,7 @@ where
     ) -> Result<Response<Self::ControlStream>, tonic::Status> {
         let mut stream = request.into_inner();
 
-        let mut agent = self.agent.clone();
+        let agent = self.agent.clone();
         let output = async_stream::try_stream! {
             while let Some(req) = stream.next().await {
                 let req = req?;

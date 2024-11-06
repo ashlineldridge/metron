@@ -2,7 +2,7 @@ use std::future::Future;
 
 use thiserror::Error;
 
-use crate::{Plan, Report};
+use crate::Plan;
 
 #[derive(Error, Debug)]
 pub enum AgentError {

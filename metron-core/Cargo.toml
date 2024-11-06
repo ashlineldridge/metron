@@ -8,6 +8,7 @@ anyhow.workspace          = true
 clap.workspace            = true
 futures-core.workspace    = true
 humantime-serde.workspace = true
+reqwest.workspace         = true
 serde.workspace           = true
 thiserror.workspace       = true
 tokio.workspace           = true

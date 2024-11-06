@@ -1,6 +1,6 @@
 use tower::discover::Discover;
 
-use crate::{Agent, AgentError, Plan, Report};
+use crate::{Agent, AgentError, Plan};
 
 #[derive(Clone)]
 #[allow(unused)]

@@ -35,7 +35,7 @@ impl AgentClient {
 const PROXY_CHAN_SIZE: usize = 1024;
 
 impl AgentClient {
-    pub async fn test(&self, plan: &Plan) -> Result<(), AgentClientError> {
+    pub async fn test(&self, _plan: &Plan) -> Result<(), AgentClientError> {
         // self.inner.control
         // let plan = plan.try_into()?;
         // self.inner
@@ -97,14 +97,14 @@ impl AgentClient {
 }
 
 impl Agent for AgentClient {
-    async fn test(&mut self, _plan: &Plan) -> Result<(), AgentError> {
+    async fn test(&self, _plan: &Plan) -> Result<(), AgentError> {
         // TODO: Create a control connection and send a oneshot plan message.
         // self.inner.c
         // self.inner.test(plan).await?;
         Ok(())
     }
 
-    async fn cancel(&mut self) -> Result<(), AgentError> {
+    async fn cancel(&self) -> Result<(), AgentError> {
         // TODO: Create a control connection and send a oneshot empty plan message.
         // self.cancel().await?;
         Ok(())

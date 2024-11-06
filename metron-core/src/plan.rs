@@ -25,6 +25,22 @@ pub enum HttpMethod {
     Connect,
 }
 
+impl From<&HttpMethod> for reqwest::Method {
+    fn from(method: &HttpMethod) -> Self {
+        match method {
+            HttpMethod::Get => reqwest::Method::GET,
+            HttpMethod::Post => reqwest::Method::POST,
+            HttpMethod::Put => reqwest::Method::PUT,
+            HttpMethod::Patch => reqwest::Method::PATCH,
+            HttpMethod::Delete => reqwest::Method::DELETE,
+            HttpMethod::Head => reqwest::Method::HEAD,
+            HttpMethod::Options => reqwest::Method::OPTIONS,
+            HttpMethod::Trace => reqwest::Method::TRACE,
+            HttpMethod::Connect => reqwest::Method::CONNECT,
+        }
+    }
+}
+
 /// Load testing plan.
 ///
 /// A [Plan] describes how a load test should be run.

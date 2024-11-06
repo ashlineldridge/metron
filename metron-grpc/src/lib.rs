@@ -6,7 +6,7 @@ pub(crate) mod proto {
 
 use anyhow::Context;
 pub use client::*;
-use metron_core::{Action, HttpMethod, Plan, RateSegment, Report};
+use metron_core::{Action, HttpMethod, Plan, RateSegment};
 pub use server::*;
 
 // ----------------------------------------------------------------------------

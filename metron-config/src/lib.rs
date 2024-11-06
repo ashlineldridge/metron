@@ -59,14 +59,14 @@ impl Default for SignallerKind {
     }
 }
 
-impl From<SignallerKind> for metron_core::Signaller {
-    fn from(kind: SignallerKind) -> Self {
-        match kind {
-            SignallerKind::Dedicated => metron_core::Signaller::Dedicated,
-            SignallerKind::Cooperative => metron_core::Signaller::Cooperative,
-        }
-    }
-}
+// impl From<SignallerKind> for metron_core::Signaller {
+//     fn from(kind: SignallerKind) -> Self {
+//         match kind {
+//             SignallerKind::Dedicated => metron_core::Signaller::Dedicated,
+//             SignallerKind::Cooperative => metron_core::Signaller::Cooperative,
+//         }
+//     }
+// }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(tag = "type", rename_all = "lowercase", content = "spec")]
