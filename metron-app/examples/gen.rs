@@ -26,8 +26,16 @@ fn main() -> Result<()> {
 
     let local_test_config = LocalTestConfig {
         plan: Plan {
-            segments: vec![],
-            actions: vec![],
+            segments: vec![RateSegment::Fixed {
+                rate: 1.0,
+                duration: Some(Duration::from_secs(30)),
+            }],
+            actions: vec![Action::Http {
+                target: "http://httpbin.org/get".try_into()?,
+                method: HttpMethod::Get,
+                headers: Headers::new(),
+                payload: vec![],
+            }],
         },
         signaller: Some(SignallerKind::Dedicated),
         worker_threads: Some(num_cpus::get()),

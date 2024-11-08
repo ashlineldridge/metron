@@ -1,29 +1,16 @@
-use std::time::{Duration, Instant};
-
-use anyhow::{Context, Result};
-use tokio::{
-    sync::{mpsc, watch},
-    task::JoinHandle,
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, Instant},
 };
+
+use anyhow::Result;
+use tokio::{sync::mpsc, task::JoinHandle};
+use tracing::info;
 
 use crate::{wait, Action, Agent, Plan, Sink};
 
 const CHAN_SIZE: usize = 1024;
-
-// #[derive(Clone, Debug)]
-// pub enum Signaller {
-//     /// A `Dedicated` signaller creates a dedicated thread for producing
-//     /// timing signals. This is the most accurate signaller for interval-
-//     /// based timing due to the fact that it does not need to cooperate with
-//     /// the scheduler.
-//     Dedicated,
-
-//     /// A `Cooperative` signaller uses a cooperatively scheduled Tokio task
-//     /// to produce timing signals. This type of signaller is useful in single-
-//     /// threaded environments or when you want to dedicate your threading
-//     /// resources elsewhere.
-//     Cooperative,
-// }
+const POLL_PERIOD: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Debug)]
 struct State {
@@ -34,144 +21,169 @@ struct State {
 #[allow(unused)]
 pub struct Runner {
     name: String,
-    state_tx: watch::Sender<Option<State>>,
+    state: Arc<Mutex<Option<State>>>,
     sinks: Vec<Sink>,
 }
 
 impl Runner {
-    pub fn run_dedicated(name: String, sinks: Vec<Sink>) -> Self {
+    pub fn run(name: String, sinks: Vec<Sink>) -> Self {
         let (signal_tx, signal_rx) = mpsc::channel(CHAN_SIZE);
-        let (state_tx, state_rx) = watch::channel(None);
+        let state: Arc<Mutex<Option<State>>> = Arc::new(Mutex::new(None));
 
-        let _h1 = Self::spawn_dedicated_signaller(signal_tx, state_rx.clone());
-        let _h2 = Self::spawn_executor(signal_rx, state_rx);
+        let _h1 = Self::spawn_signaller(signal_tx, state.clone());
+        let _h2 = Self::spawn_executor(signal_rx, state.clone());
 
         // TODO: Potentially need to put these handles into Self or equivalent.
-        Self {
-            name,
-            state_tx,
-            sinks,
-        }
+        Self { name, state, sinks }
+    }
+
+    fn spawn_signaller(
+        signal_tx: mpsc::Sender<Signal>,
+        state: Arc<Mutex<Option<State>>>,
+    ) -> JoinHandle<Result<()>> {
+        tokio::task::spawn_blocking(move || {
+            while state.lock().unwrap().is_none() {
+                std::thread::sleep(POLL_PERIOD);
+            }
+
+            let state = state.lock().unwrap().clone().unwrap();
+
+            // TODO: Consider forcing the plan to have a stop time.
+            let plan_duration = state.plan.calculate_duration().unwrap();
+            let stop_at = state.start.checked_add(plan_duration).unwrap();
+
+            for (i, t) in state
+                .plan
+                .ticks(state.start)
+                .filter(|&i| i <= stop_at)
+                .enumerate()
+            {
+                let since_pre_a_micros = Instant::now()
+                    .checked_duration_since(t)
+                    .map(|d| d.as_micros());
+                let since_pre_b_micros = t
+                    .checked_duration_since(Instant::now())
+                    .map(|d| d.as_micros());
+
+                wait::spin_until(t);
+
+                let since_a_micros = Instant::now()
+                    .checked_duration_since(t)
+                    .map(|d| d.as_micros());
+                let since_b_micros = t
+                    .checked_duration_since(Instant::now())
+                    .map(|d| d.as_micros());
+
+                if signal_tx.blocking_send(Signal::new(i as u32, t)).is_err() {
+                    break;
+                }
+
+                info!(
+                    id = i,
+                    since_pre_a_micros = since_pre_a_micros,
+                    since_pre_b_micros = since_pre_b_micros,
+                    since_a_micros = since_a_micros,
+                    since_b_micros = since_b_micros,
+                    "signaller: after blocking send",
+                );
+
+                // TODO: Check the mutex every POLL_PERIOD and if it has changed break the loop.
+            }
+
+            Ok(())
+        })
     }
 
     fn spawn_executor(
         mut signal_rx: mpsc::Receiver<Signal>,
-        mut state_rx: watch::Receiver<Option<State>>,
+        state: Arc<Mutex<Option<State>>>,
     ) -> JoinHandle<Result<()>> {
         // Launch async "executor" task
         tokio::task::spawn(async move {
-            let mut state = None;
+            while state.lock().unwrap().is_none() {
+                tokio::time::sleep(POLL_PERIOD).await;
+            }
+
+            let state = state.lock().unwrap().clone().unwrap();
+
             loop {
-                tokio::select! {
-                    res = state_rx.changed() => {
-                        if res.is_err() {
-                            // State sender has been dropped so complete.
-                            return Ok(());
-                        }
-                        state = state_rx.borrow().clone();
-                    },
-                    sig = signal_rx.recv() => {
-                        match (sig, state.clone()) {
-                            // Signaller sender has been dropped so complete.
-                            (None, _) => return Ok(()),
-                            (Some(_sig), Some(state)) => {
-                                tokio::task::spawn(async move {
-                                    for action in &state.plan.actions {
-                                        if let Action::Http {
-                                            target,
-                                            method,
-                                            headers,
-                                            payload,
-                                        } = action
-                                        {
-                                            let headers = headers.try_into()?;
-                                            let client = reqwest::ClientBuilder::new()
-                                            .default_headers(headers)
-                                            .build()?;
-                                            client
-                                            .request(method.into(), target.to_string())
-                                            .body(payload.clone())
-                                            .send()
-                                            .await?;
-                                        }
-                                    }
-                                    Result::<(), anyhow::Error>::Ok(())
-                                });
-                            },
-                            _ => (),
-                        };
-                    },
+                let sig = signal_rx.recv().await;
+                match sig {
+                    // Signaller sender has been dropped so complete.
+                    None => {
+                        info!("executor: signal_tx must have been dropped");
+                        return Ok(());
+                    }
+                    Some(sig) => {
+                        info!(
+                            id = sig.id,
+                            elapsed_micros = sig.due.elapsed().as_micros(),
+                            "executor: received signal and have current state"
+                        );
+
+                        let actions = state.plan.actions.clone();
+                        tokio::task::spawn(async move {
+                            for action in &actions {
+                                if let Action::Http {
+                                    target,
+                                    method,
+                                    headers,
+                                    payload,
+                                } = action
+                                {
+                                    let headers = headers.try_into()?;
+                                    let client = reqwest::ClientBuilder::new()
+                                        .default_headers(headers)
+                                        .build()?;
+                                    client
+                                        .request(method.into(), target.to_string())
+                                        .body(payload.clone())
+                                        .send()
+                                        .await?;
+                                }
+                            }
+                            Result::<(), anyhow::Error>::Ok(())
+                        });
+                    }
                 };
+
+                // TODO: Check the mutex every POLL_PERIOD and if it has changed break the loop.
             }
         })
-    }
-
-    fn spawn_dedicated_signaller(
-        signal_tx: mpsc::Sender<Signal>,
-        mut state_rx: watch::Receiver<Option<State>>,
-    ) -> JoinHandle<Result<()>> {
-        // Start the thread-blocking task that generates the timing signals.
-        let handle = tokio::task::spawn_blocking(move || {
-            let mut state = state_rx.borrow().clone();
-            loop {
-                if let Some(State { plan, start }) = &state {
-                    for t in plan.ticks(*start) {
-                        wait::spin_until(t);
-
-                        if signal_tx.blocking_send(Signal::new(t)).is_err() {
-                            return Result::<(), anyhow::Error>::Ok(());
-                        }
-
-                        match state_rx.has_changed() {
-                            Err(_) => return Result::<(), anyhow::Error>::Ok(()),
-                            Ok(false) => (),
-                            Ok(true) => {
-                                let new_state = state_rx.borrow_and_update().clone();
-                                // TODO: Should probably implement Eq, etc for State (and Plan...) as
-                                // has_changed returns true even if the underlying value is the same.
-                                // if state != new_state { break; }
-                                state = new_state;
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    std::thread::sleep(Duration::from_millis(500));
-                }
-            }
-        });
-
-        handle
     }
 }
 
 impl Agent for Runner {
     async fn test(&self, plan: &Plan) -> Result<(), crate::AgentError> {
-        // TODO: This needs to be when the test started.
-        let state = State {
+        info!("sending test state to agent");
+
+        let mut state = self.state.lock().unwrap();
+        *state = Some(State {
             plan: plan.clone(),
+            // TODO: This needs to be when the test started.
             start: Instant::now(),
-        };
-        self.state_tx
-            .send(Some(state))
-            .context("could not update runner")?;
+        });
+
+        info!("test state has been sent to agent");
         Ok(())
     }
 
     async fn cancel(&self) -> Result<(), crate::AgentError> {
-        self.state_tx.send(None).context("could not stop runner")?;
+        let mut state = self.state.lock().unwrap();
+        *state = None;
         Ok(())
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Signal {
+    pub id: u32,
     pub due: Instant,
 }
 
 impl Signal {
-    fn new(due: Instant) -> Self {
-        Self { due }
+    fn new(id: u32, due: Instant) -> Self {
+        Self { id, due }
     }
 }
 

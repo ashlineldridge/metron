@@ -15,3 +15,6 @@ test:
 
 gen:
     cargo run --example gen -- ./examples
+
+example-local-test:
+    RUST_LOG=info cargo run -- test -f examples/local-test-config.yaml

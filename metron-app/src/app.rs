@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Result;
 use metron_config::*;
 use metron_core::{Agent, Proxy, Runner};
@@ -10,8 +12,9 @@ const DEFAULT_AGENT_PORT: u16 = 9090;
 pub async fn run_local_test(config: LocalTestConfig) -> Result<()> {
     info!("running local test");
 
-    let runner = Runner::run_dedicated("local".to_owned(), config.sinks);
+    let runner = Runner::run("local".to_owned(), config.sinks);
     runner.test(&config.plan).await?;
+    tokio::time::sleep(Duration::from_secs(12)).await;
 
     Ok(())
 }
@@ -29,7 +32,7 @@ pub async fn run_remote_test(config: RemoteTestConfig) -> Result<()> {
 pub async fn run_agent_server(config: AgentConfig) -> Result<()> {
     info!("running agent server");
 
-    let runner = Runner::run_dedicated("agent".to_owned(), config.sinks);
+    let runner = Runner::run("agent".to_owned(), config.sinks);
     let port = config.port.unwrap_or(DEFAULT_AGENT_PORT);
     let server = AgentServer::new(runner, port);
     server.run().await?;

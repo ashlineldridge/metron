@@ -1,6 +1,14 @@
 plan:
-  segments: []
-  actions: []
+  segments:
+  - kind: fixed
+    rate: 1.0
+    duration: 30s
+  actions:
+  - kind: http
+    target: http://httpbin.org/get
+    method: get
+    headers: {}
+    payload: []
 signaller: dedicated
 worker_threads: 12
 logging:
