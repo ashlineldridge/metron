@@ -25,6 +25,10 @@ pub struct Runner {
     sinks: Vec<Sink>,
 }
 
+/*
+Create system where:
+- signaller async task has oneshot
+*/
 impl Runner {
     pub fn run(name: String, sinks: Vec<Sink>) -> Self {
         let (signal_tx, signal_rx) = mpsc::channel(CHAN_SIZE);
@@ -35,6 +39,64 @@ impl Runner {
 
         // TODO: Potentially need to put these handles into Self or equivalent.
         Self { name, state, sinks }
+    }
+
+    // Much less accurate (~2000 micro signaling delta as opposed to ~50 micro signaling delta for blocking).
+    fn spawn_signaller_coop(
+        signal_tx: mpsc::Sender<Signal>,
+        state: Arc<Mutex<Option<State>>>,
+    ) -> JoinHandle<Result<()>> {
+        tokio::task::spawn(async move {
+            while state.lock().unwrap().is_none() {
+                std::thread::sleep(POLL_PERIOD);
+            }
+
+            let state = state.lock().unwrap().clone().unwrap();
+
+            // TODO: Consider forcing the plan to have a stop time.
+            let plan_duration = state.plan.calculate_duration().unwrap();
+            let stop_at = state.start.checked_add(plan_duration).unwrap();
+
+            for (i, t) in state
+                .plan
+                .ticks(state.start)
+                .filter(|&i| i <= stop_at)
+                .enumerate()
+            {
+                let since_pre_a_micros = Instant::now()
+                    .checked_duration_since(t)
+                    .map(|d| d.as_micros());
+                let since_pre_b_micros = t
+                    .checked_duration_since(Instant::now())
+                    .map(|d| d.as_micros());
+
+                wait::sleep_until(t).await;
+
+                let since_a_micros = Instant::now()
+                    .checked_duration_since(t)
+                    .map(|d| d.as_micros());
+                let since_b_micros = t
+                    .checked_duration_since(Instant::now())
+                    .map(|d| d.as_micros());
+
+                if signal_tx.send(Signal::new(i as u32, t)).await.is_err() {
+                    break;
+                }
+
+                info!(
+                    id = i,
+                    since_pre_a_micros = since_pre_a_micros,
+                    since_pre_b_micros = since_pre_b_micros,
+                    since_a_micros = since_a_micros,
+                    since_b_micros = since_b_micros,
+                    "signaller: after coop send",
+                );
+
+                // TODO: Check the mutex every POLL_PERIOD and if it has changed break the loop.
+            }
+
+            Ok(())
+        })
     }
 
     fn spawn_signaller(

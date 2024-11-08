@@ -14,7 +14,7 @@ pub async fn run_local_test(config: LocalTestConfig) -> Result<()> {
 
     let runner = Runner::run("local".to_owned(), config.sinks);
     runner.test(&config.plan).await?;
-    tokio::time::sleep(Duration::from_secs(12)).await;
+    tokio::time::sleep(Duration::from_secs(30)).await;
 
     Ok(())
 }
