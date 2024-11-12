@@ -10,11 +10,12 @@ async-trait.workspace  = true
 metron-core            = { path = "../metron-core" }
 prost-types.workspace  = true
 prost.workspace        = true
-thiserror.workspace    = true
+quanta.workspace       = true
 tokio-stream.workspace = true
 tokio.workspace        = true
 tonic.workspace        = true
 tower.workspace        = true
+tracing.workspace      = true
 
 [build-dependencies]
 tonic-build.workspace  = true

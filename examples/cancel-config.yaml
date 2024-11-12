@@ -2,5 +2,4 @@ agents:
 - type: static
   spec:
     endpoints:
-    - 198.120.113.0:8080
-    - foo.bar.com:8080
+    - 127.0.0.1:8989

@@ -1,9 +1,7 @@
-use std::{
-    collections::HashMap,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, time::Duration};
 
 use clap::ValueEnum;
+use quanta::Instant;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -46,13 +44,15 @@ impl From<&HttpMethod> for reqwest::Method {
 /// A [Plan] describes how a load test should be run.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Plan {
-    pub segments: Vec<RateSegment>,
+    pub name: String,
+    pub segments: Vec<Segment>,
     pub actions: Vec<Action>,
 }
 
 impl Plan {
     pub fn empty() -> Self {
         Self {
+            name: String::new(),
             segments: vec![],
             actions: vec![],
         }
@@ -63,33 +63,23 @@ impl Plan {
     }
 
     /// Calculates the total duration of the plan.
-    ///
-    /// If the returned value is `None` the plan runs forever.
-    pub fn calculate_duration(&self) -> Option<Duration> {
+    pub fn calculate_duration(&self) -> Duration {
         self.segments
             .iter()
-            .try_fold(Duration::from_secs(0), |total, seg| {
-                seg.duration().map(|d| total + d)
-            })
+            .fold(Duration::from_secs(0), |total, seg| total + seg.duration)
     }
 
     /// Finds the `PlanSegment` that `progress` falls into.
     ///
     /// If the returned value is `None` then we have completed the plan.
-    fn find_segment(&self, progress: Duration) -> Option<RateSegment> {
+    fn find_segment(&self, progress: Duration) -> Option<Segment> {
         let mut total = Duration::from_secs(0);
         for seg in &self.segments {
-            if let Some(d) = seg.duration() {
-                total += d;
-                if progress < total {
-                    return Some(seg.clone());
-                }
-            } else {
-                // The plan runs forever.
+            total += seg.duration;
+            if progress < total {
                 return Some(seg.clone());
             }
         }
-
         None
     }
 }
@@ -98,12 +88,14 @@ impl Plan {
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum Action {
     Http {
+        name: String,
         target: Url,
         method: HttpMethod,
         headers: Headers,
         payload: Vec<u8>,
     },
     Udp {
+        name: String,
         target: Url,
         payload: Vec<u8>,
     },
@@ -111,12 +103,14 @@ pub enum Action {
     // E.g. A https://github.com/RustPython/RustPython might be nice
     // but don't want all builds to pull in that dependency.
     Exec {
+        name: String,
         command: String,
         args: Vec<String>,
         env: Environment,
     },
     // See: https://docs.datadoghq.com/synthetics/api_tests/grpc_tests/?tab=behaviorcheck
     // Grpc {
+    //     // name: String,
     //     // What is a stronger type to use here?
     //     // proto_file: String,
     //     // rpc: String,
@@ -124,44 +118,24 @@ pub enum Action {
     // },
     Wasm {
         // TODO: For running a WASM module.
+        // name: String,
     },
 }
 
-/// How request rate should be treated over a given duration.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(tag = "kind", rename_all = "lowercase")]
-pub enum RateSegment {
-    /// Rate should be fixed over the given duration (or forever).
-    Fixed {
-        rate: Rate,
-        #[serde(default)]
-        #[serde(with = "humantime_serde")]
-        duration: Option<Duration>,
-    },
-
-    /// Rate should vary linearly over the given duration.
-    Linear {
-        rate_start: Rate,
-        rate_end: Rate,
-        #[serde(with = "humantime_serde")]
-        duration: Duration,
-    },
-}
-
-impl RateSegment {
-    fn duration(&self) -> Option<Duration> {
-        match self {
-            RateSegment::Fixed { duration, .. } => *duration,
-            RateSegment::Linear { duration, .. } => Some(*duration),
-        }
-    }
+pub struct Segment {
+    pub name: String,
+    pub rate_start: Rate,
+    pub rate_end: Rate,
+    #[serde(with = "humantime_serde")]
+    pub duration: Duration,
 }
 
 pub struct Ticks<'a> {
     /// The plan.
     plan: &'a Plan,
     /// Cached plan duration.
-    duration: Option<Duration>,
+    duration: Duration,
     /// When the plan was started.
     start: Instant,
     /// Previously returned instant (none if not started).
@@ -190,37 +164,19 @@ impl Iterator for Ticks<'_> {
         // How far into the plan are we?
         let progress = self.prev.unwrap_or(self.start) - self.start;
 
-        if let Some(block) = self.plan.find_segment(progress) {
-            // Calculate the next value in the series.
-            let next = match block {
-                RateSegment::Fixed { rate, .. } => self
-                    .prev
-                    .map(|t| t + Self::rate_period(rate))
-                    .unwrap_or(self.start),
+        // Calculate the next value in the series.
+        if let Some(seg) = self.plan.find_segment(progress) {
+            let ramp_start = Self::rate_period(seg.rate_start).as_secs_f32();
+            let ramp_end = Self::rate_period(seg.rate_end).as_secs_f32();
+            let duration = seg.duration.as_secs_f32();
+            let progress = progress.as_secs_f32();
+            let ramp_progress_factor = (ramp_start - ramp_end) * (progress / duration).min(1.0);
+            let delta = Duration::from_secs_f32(ramp_start - ramp_progress_factor);
 
-                RateSegment::Linear {
-                    rate_start,
-                    rate_end,
-                    duration,
-                } => {
-                    let ramp_start = Self::rate_period(rate_start).as_secs_f32();
-                    let ramp_end = Self::rate_period(rate_end).as_secs_f32();
-                    let duration = duration.as_secs_f32();
-                    let progress = progress.as_secs_f32();
-
-                    let ramp_progress_factor =
-                        (ramp_start - ramp_end) * (progress / duration).min(1.0);
-                    let delta = Duration::from_secs_f32(ramp_start - ramp_progress_factor);
-
-                    self.prev.map(|t| t + delta).unwrap_or(self.start)
-                }
-            };
-
+            let next = self.prev.map(|t| t + delta).unwrap_or(self.start);
             self.prev = Some(next);
 
-            if let Some(d) = self.duration
-                && next - self.start >= d
-            {
+            if next - self.start >= self.duration {
                 None
             } else {
                 self.prev

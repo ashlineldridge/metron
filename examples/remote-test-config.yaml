@@ -1,9 +1,19 @@
 plan:
-  segments: []
-  actions: []
+  name: myplan
+  segments:
+  - name: mysegment
+    rate_start: 1.0
+    rate_end: 1.0
+    duration: 30s
+  actions:
+  - kind: http
+    name: actionname
+    target: http://httpbin.org/get
+    method: get
+    headers: {}
+    payload: []
 agents:
 - type: static
   spec:
     endpoints:
-    - 198.120.113.0:8080
-    - foo.bar.com:8080
+    - "http://[::1]:8989"

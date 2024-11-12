@@ -1,16 +1,11 @@
-use std::{
-    sync::{Arc, Mutex},
-    time::{Duration, Instant},
-};
-
-use anyhow::Result;
+use anyhow::{Context, Result};
+use quanta::{Clock, Instant};
 use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::info;
+use tracing::{info, warn};
 
-use crate::{wait, Action, Agent, Plan, Sink};
+use crate::{Action, Agent, AgentRequest, Plan, Sink};
 
 const CHAN_SIZE: usize = 1024;
-const POLL_PERIOD: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Debug)]
 struct State {
@@ -19,99 +14,66 @@ struct State {
 }
 
 #[allow(unused)]
+#[derive(Clone)]
 pub struct Runner {
     name: String,
-    state: Arc<Mutex<Option<State>>>,
     sinks: Vec<Sink>,
+    state_tx: mpsc::Sender<Option<State>>,
 }
 
-/*
-Create system where:
-- signaller async task has oneshot
-*/
 impl Runner {
     pub fn run(name: String, sinks: Vec<Sink>) -> Self {
-        let (signal_tx, signal_rx) = mpsc::channel(CHAN_SIZE);
-        let state: Arc<Mutex<Option<State>>> = Arc::new(Mutex::new(None));
+        let clock = Clock::new();
+        let (state_tx, mut state_rx) = mpsc::channel::<Option<State>>(CHAN_SIZE);
 
-        let _h1 = Self::spawn_signaller(signal_tx, state.clone());
-        let _h2 = Self::spawn_executor(signal_rx, state.clone());
+        let _h0 = tokio::task::spawn(async move {
+            let mut handles: Option<(JoinHandle<Result<()>>, JoinHandle<Result<()>>)> = None;
 
-        // TODO: Potentially need to put these handles into Self or equivalent.
-        Self { name, state, sinks }
-    }
+            // TODO: Incorporate current state to check if there's actually a diff. This will make it easier
+            // on the proxy to send updates knowing that the agent won't stop/start the signalling unless there's
+            // and actual change.
+            // let mut current_state = None;
 
-    // Much less accurate (~2000 micro signaling delta as opposed to ~50 micro signaling delta for blocking).
-    fn spawn_signaller_coop(
-        signal_tx: mpsc::Sender<Signal>,
-        state: Arc<Mutex<Option<State>>>,
-    ) -> JoinHandle<Result<()>> {
-        tokio::task::spawn(async move {
-            while state.lock().unwrap().is_none() {
-                std::thread::sleep(POLL_PERIOD);
-            }
-
-            let state = state.lock().unwrap().clone().unwrap();
-
-            // TODO: Consider forcing the plan to have a stop time.
-            let plan_duration = state.plan.calculate_duration().unwrap();
-            let stop_at = state.start.checked_add(plan_duration).unwrap();
-
-            for (i, t) in state
-                .plan
-                .ticks(state.start)
-                .filter(|&i| i <= stop_at)
-                .enumerate()
-            {
-                let since_pre_a_micros = Instant::now()
-                    .checked_duration_since(t)
-                    .map(|d| d.as_micros());
-                let since_pre_b_micros = t
-                    .checked_duration_since(Instant::now())
-                    .map(|d| d.as_micros());
-
-                wait::sleep_until(t).await;
-
-                let since_a_micros = Instant::now()
-                    .checked_duration_since(t)
-                    .map(|d| d.as_micros());
-                let since_b_micros = t
-                    .checked_duration_since(Instant::now())
-                    .map(|d| d.as_micros());
-
-                if signal_tx.send(Signal::new(i as u32, t)).await.is_err() {
-                    break;
+            while let Some(state) = state_rx.recv().await {
+                if let Some((_signaller, executor)) = &handles {
+                    executor.abort();
+                    // executor.await;
+                    // signaller.await;
                 }
 
-                info!(
-                    id = i,
-                    since_pre_a_micros = since_pre_a_micros,
-                    since_pre_b_micros = since_pre_b_micros,
-                    since_a_micros = since_a_micros,
-                    since_b_micros = since_b_micros,
-                    "signaller: after coop send",
-                );
-
-                // TODO: Check the mutex every POLL_PERIOD and if it has changed break the loop.
+                if let Some(state) = state {
+                    let (signal_tx, signal_rx) = mpsc::channel(CHAN_SIZE);
+                    let signaller =
+                        Self::spawn_blocking_signaller(clock.clone(), signal_tx, state.clone());
+                    let executor = Self::spawn_executor(signal_rx, state);
+                    handles = Some((signaller, executor));
+                }
             }
+        });
 
-            Ok(())
-        })
+        Self {
+            name,
+            sinks,
+            state_tx,
+        }
     }
 
-    fn spawn_signaller(
+    fn spin_until(clock: &Clock, t: Instant) {
+        loop {
+            if clock.now() >= t {
+                break;
+            }
+            std::hint::spin_loop();
+        }
+    }
+
+    fn spawn_blocking_signaller(
+        clock: Clock,
         signal_tx: mpsc::Sender<Signal>,
-        state: Arc<Mutex<Option<State>>>,
+        state: State,
     ) -> JoinHandle<Result<()>> {
         tokio::task::spawn_blocking(move || {
-            while state.lock().unwrap().is_none() {
-                std::thread::sleep(POLL_PERIOD);
-            }
-
-            let state = state.lock().unwrap().clone().unwrap();
-
-            // TODO: Consider forcing the plan to have a stop time.
-            let plan_duration = state.plan.calculate_duration().unwrap();
+            let plan_duration = state.plan.calculate_duration();
             let stop_at = state.start.checked_add(plan_duration).unwrap();
 
             for (i, t) in state
@@ -120,21 +82,15 @@ impl Runner {
                 .filter(|&i| i <= stop_at)
                 .enumerate()
             {
-                let since_pre_a_micros = Instant::now()
-                    .checked_duration_since(t)
-                    .map(|d| d.as_micros());
-                let since_pre_b_micros = t
-                    .checked_duration_since(Instant::now())
-                    .map(|d| d.as_micros());
+                let since_pre_a_micros =
+                    clock.now().checked_duration_since(t).map(|d| d.as_micros());
+                let since_pre_b_micros =
+                    t.checked_duration_since(clock.now()).map(|d| d.as_micros());
 
-                wait::spin_until(t);
+                Self::spin_until(&clock, t);
 
-                let since_a_micros = Instant::now()
-                    .checked_duration_since(t)
-                    .map(|d| d.as_micros());
-                let since_b_micros = t
-                    .checked_duration_since(Instant::now())
-                    .map(|d| d.as_micros());
+                let since_a_micros = clock.now().checked_duration_since(t).map(|d| d.as_micros());
+                let since_b_micros = t.checked_duration_since(clock.now()).map(|d| d.as_micros());
 
                 if signal_tx.blocking_send(Signal::new(i as u32, t)).is_err() {
                     break;
@@ -148,91 +104,72 @@ impl Runner {
                     since_b_micros = since_b_micros,
                     "signaller: after blocking send",
                 );
-
-                // TODO: Check the mutex every POLL_PERIOD and if it has changed break the loop.
             }
 
+            warn!("signaller: done");
             Ok(())
         })
     }
 
     fn spawn_executor(
         mut signal_rx: mpsc::Receiver<Signal>,
-        state: Arc<Mutex<Option<State>>>,
+        state: State,
     ) -> JoinHandle<Result<()>> {
         // Launch async "executor" task
         tokio::task::spawn(async move {
-            while state.lock().unwrap().is_none() {
-                tokio::time::sleep(POLL_PERIOD).await;
+            while let Some(sig) = signal_rx.recv().await {
+                info!(
+                    id = sig.id,
+                    elapsed_micros = sig.due.elapsed().as_micros(),
+                    "executor: received signal and have current state"
+                );
+
+                let actions = state.plan.actions.clone();
+                tokio::task::spawn(async move {
+                    for action in &actions {
+                        if let Action::Http {
+                            name: _,
+                            target,
+                            method,
+                            headers,
+                            payload,
+                        } = action
+                        {
+                            let headers = headers.try_into()?;
+                            let client = reqwest::ClientBuilder::new()
+                                .default_headers(headers)
+                                .build()?;
+                            client
+                                .request(method.into(), target.to_string())
+                                .body(payload.clone())
+                                .send()
+                                .await?;
+                        }
+                    }
+                    Result::<(), anyhow::Error>::Ok(())
+                });
             }
 
-            let state = state.lock().unwrap().clone().unwrap();
-
-            loop {
-                let sig = signal_rx.recv().await;
-                match sig {
-                    // Signaller sender has been dropped so complete.
-                    None => {
-                        info!("executor: signal_tx must have been dropped");
-                        return Ok(());
-                    }
-                    Some(sig) => {
-                        info!(
-                            id = sig.id,
-                            elapsed_micros = sig.due.elapsed().as_micros(),
-                            "executor: received signal and have current state"
-                        );
-
-                        let actions = state.plan.actions.clone();
-                        tokio::task::spawn(async move {
-                            for action in &actions {
-                                if let Action::Http {
-                                    target,
-                                    method,
-                                    headers,
-                                    payload,
-                                } = action
-                                {
-                                    let headers = headers.try_into()?;
-                                    let client = reqwest::ClientBuilder::new()
-                                        .default_headers(headers)
-                                        .build()?;
-                                    client
-                                        .request(method.into(), target.to_string())
-                                        .body(payload.clone())
-                                        .send()
-                                        .await?;
-                                }
-                            }
-                            Result::<(), anyhow::Error>::Ok(())
-                        });
-                    }
-                };
-
-                // TODO: Check the mutex every POLL_PERIOD and if it has changed break the loop.
-            }
+            // signal_rx must have returned None to indicate that signal_tx has been dropped
+            warn!("executor: done");
+            Ok(())
         })
     }
+
+    // async fn wait(&self) {
+    //     self.
+    // }
 }
 
 impl Agent for Runner {
-    async fn test(&self, plan: &Plan) -> Result<(), crate::AgentError> {
-        info!("sending test state to agent");
+    async fn execute(&self, req: AgentRequest) -> Result<()> {
+        info!("runner: sending test state to agent");
+        let AgentRequest { plan, start } = req;
+        self.state_tx
+            .send(Some(State { plan, start }))
+            .await
+            .context("could not send state")?;
 
-        let mut state = self.state.lock().unwrap();
-        *state = Some(State {
-            plan: plan.clone(),
-            // TODO: This needs to be when the test started.
-            start: Instant::now(),
-        });
-
-        info!("test state has been sent to agent");
-        Ok(())
-    }
-
-    async fn cancel(&self) -> Result<(), crate::AgentError> {
-        let mut state = self.state.lock().unwrap();
-        *state = None;
         Ok(())
     }
 }

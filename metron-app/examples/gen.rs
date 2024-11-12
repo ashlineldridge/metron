@@ -13,30 +13,32 @@ use serde::ser;
 /// Generate example config files and save them under the top-level examples directory.
 fn main() -> Result<()> {
     let remote_agents = vec![RemoteAgentDiscovery::Static(StaticAgentDiscovery {
-        endpoints: vec![
-            "198.120.113.0:8080".to_owned(),
-            "foo.bar.com:8080".to_owned(),
-        ],
+        endpoints: vec!["127.0.0.1:8989".to_owned()],
     })];
     let sinks = vec![Sink::Otel(OtelSink {
         address: url::Url::parse("http://localhost:8989")?,
         period: Duration::from_secs(60),
         timeout: Duration::from_secs(60),
     })];
+    let plan = Plan {
+        name: "myplan".to_owned(),
+        segments: vec![Segment {
+            name: "mysegment".to_owned(),
+            rate_start: 1.0,
+            rate_end: 1.0,
+            duration: Duration::from_secs(30),
+        }],
+        actions: vec![Action::Http {
+            name: "actionname".to_owned(),
+            target: "http://httpbin.org/get".try_into()?,
+            method: HttpMethod::Get,
+            headers: Headers::new(),
+            payload: vec![],
+        }],
+    };
 
     let local_test_config = LocalTestConfig {
-        plan: Plan {
-            segments: vec![RateSegment::Fixed {
-                rate: 1.0,
-                duration: Some(Duration::from_secs(30)),
-            }],
-            actions: vec![Action::Http {
-                target: "http://httpbin.org/get".try_into()?,
-                method: HttpMethod::Get,
-                headers: Headers::new(),
-                payload: vec![],
-            }],
-        },
+        plan: plan.clone(),
         signaller: Some(SignallerKind::Dedicated),
         worker_threads: Some(num_cpus::get()),
         logging: Some(LoggingConfig {
@@ -46,10 +48,7 @@ fn main() -> Result<()> {
         sinks: sinks.clone(),
     };
     let remote_test_config = RemoteTestConfig {
-        plan: Plan {
-            segments: vec![],
-            actions: vec![],
-        },
+        plan: plan.clone(),
         agents: remote_agents.clone(),
     };
     let agent_config = AgentConfig {
@@ -93,7 +92,7 @@ fn save_config<T: ?Sized + ser::Serialize, P: AsRef<Path>>(config: &T, path: P) 
     println!("Saving {}", path.as_ref().to_str().unwrap());
     let mut writer = BufWriter::new(File::create(path)?);
     let data = serde_yaml::to_string(config)?;
-    writer.write_all(data.trim().as_bytes())?;
+    writer.write_all(data.as_bytes())?;
 
     Ok(())
 }

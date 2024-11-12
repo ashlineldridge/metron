@@ -1,16 +1,15 @@
 use std::future::Future;
 
-use thiserror::Error;
+use quanta::Instant;
 
 use crate::Plan;
 
-#[derive(Error, Debug)]
-pub enum AgentError {
-    #[error(transparent)]
-    Unexpected(#[from] anyhow::Error),
+#[derive(Clone, Debug)]
+pub struct AgentRequest {
+    pub plan: Plan,
+    pub start: Instant,
 }
 
 pub trait Agent {
-    fn test(&self, plan: &Plan) -> impl Future<Output = Result<(), AgentError>> + Send;
-    fn cancel(&self) -> impl Future<Output = Result<(), AgentError>> + Send;
+    fn execute(&self, req: AgentRequest) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
 }

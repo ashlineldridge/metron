@@ -3,24 +3,13 @@ use std::{
     hash::Hash,
     pin::Pin,
     task::{Context, Poll},
-    time::Duration,
 };
 
-use futures_core::ready;
-use thiserror::Error;
-use tower::{
-    discover::{Change, Discover},
-    ready_cache::ReadyCache,
-    Service,
-};
+use anyhow::Result;
+use tower::{discover::Discover, ready_cache::ReadyCache, Service};
 use tracing::debug;
 
-#[derive(Error, Debug)]
-pub enum SchedulerError {
-    #[error(transparent)]
-    Unexpected(#[from] anyhow::Error),
-}
-
+#[allow(unused)]
 pub struct Scheduler<D, Req>
 where
     D: Discover,
@@ -45,30 +34,24 @@ where
         }
     }
 
-    fn discover_agents(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<(), SchedulerError>>> {
+    fn discover_agents(&mut self, _cx: &mut Context<'_>) -> Poll<Option<Result<()>>> {
         debug!("discovering agents");
-        loop {
-            let ready = ready!(Pin::new(&mut self.discover).poll_discover(cx))
-                .transpose()
-                .map_err(|e| {
-                    SchedulerError::Unexpected(anyhow::anyhow!("boom: {:?}", e.into().to_string()))
-                })?;
+        todo!()
+        //     loop {
+        //         let ready = ready!(Pin::new(&mut self.discover).poll_discover(cx)).transpose()?;
 
-            match ready {
-                None => return Poll::Ready(None),
-                Some(Change::Remove(key)) => {
-                    debug!("removing agent");
-                    self.services.evict(&key);
-                }
-                Some(Change::Insert(key, svc)) => {
-                    debug!("inserting agent");
-                    self.services.push(key, svc);
-                }
-            }
-        }
+        //         match ready {
+        //             None => return Poll::Ready(None),
+        //             Some(Change::Remove(key)) => {
+        //                 debug!("removing agent");
+        //                 self.services.evict(&key);
+        //             }
+        //             Some(Change::Insert(key, svc)) => {
+        //                 debug!("inserting agent");
+        //                 self.services.push(key, svc);
+        //             }
+        //         }
+        //     }
     }
 }
 
@@ -90,9 +73,10 @@ where
     }
 
     fn call(&mut self, _request: Req) -> Self::Future {
-        Box::pin(async {
-            tokio::time::sleep(Duration::from_millis(250)).await;
-            Ok(())
-        })
+        todo!()
+        // Box::pin(async {
+        //     tokio::time::sleep(Duration::from_millis(250)).await;
+        //     Ok(())
+        // })
     }
 }

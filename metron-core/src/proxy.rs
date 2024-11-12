@@ -1,9 +1,10 @@
+use anyhow::Result;
 use tower::discover::Discover;
 
-use crate::{Agent, AgentError, Plan};
+use crate::{Agent, AgentRequest};
 
-#[derive(Clone)]
 #[allow(unused)]
+#[derive(Clone)]
 pub struct Proxy<D> {
     name: String,
     discover: D,
@@ -21,46 +22,18 @@ where
         Self { name, discover }
     }
 
-    pub async fn run(&mut self) -> Result<(), AgentError> {
-        // self.discover.pol
-        // let mut balancer = Balance::new(self.discover.clone());
-
-        // let requests = (1..10)
-        //     .map(|id| Request::new(format!("request-{id}")))
-        //     .collect::<Vec<_>>();
-        // let requests = futures::stream::iter(requests);
-
-        // info!("calling load balancing");
-
-        // let mut result = balancer.ready().await.expect("oh no").call_all(requests);
-
-        // while let Some(resp) = result.next().await {
-        //     let resp = resp.expect("oh no");
-        //     info!("got response {}", resp.value);
-        // }
-
-        // Ok(())
+    pub async fn run(&mut self) -> Result<()> {
         Ok(())
-
-        // // TODO: This needs to load balance over the agents.
-        // for agent in &self.agents {
-        //     agent
-        //         .clone()
-        //         .call(plan.clone())
-        //         .await
-        //         .map_err(|e| AgentError::Unexpected(e.into()))?;
-        // }
-
-        // Ok(())
     }
 }
 
-impl<D: Send + Sync> Agent for Proxy<D> {
-    async fn test(&self, _plan: &Plan) -> Result<(), AgentError> {
-        Ok(())
-    }
-
-    async fn cancel(&self) -> Result<(), AgentError> {
+impl<D> Agent for Proxy<D>
+where
+    // A: Agent + Send + Sync + 'static,
+    D: Discover + Send + Sync + 'static,
+    D::Service: Agent + Send + Sync + 'static,
+{
+    async fn execute(&self, _req: AgentRequest) -> Result<()> {
         Ok(())
     }
 }

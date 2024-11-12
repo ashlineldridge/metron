@@ -1,10 +1,13 @@
 plan:
+  name: myplan
   segments:
-  - kind: fixed
-    rate: 1.0
+  - name: mysegment
+    rate_start: 1.0
+    rate_end: 1.0
     duration: 30s
   actions:
   - kind: http
+    name: actionname
     target: http://httpbin.org/get
     method: get
     headers: {}

@@ -17,9 +17,9 @@ metron-config                = { path = "../metron-config" }
 metron-core                  = { path = "../metron-core" }
 metron-grpc                  = { path = "../metron-grpc" }
 num_cpus.workspace           = true
+quanta.workspace             = true
 serde.workspace              = true
 serde_yaml.workspace         = true
-thiserror.workspace          = true
 tokio.workspace              = true
 tower.workspace              = true
 tracing-core.workspace       = true

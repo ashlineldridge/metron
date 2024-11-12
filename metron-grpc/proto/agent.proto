@@ -18,7 +18,7 @@ service Agent {
 
 message ControlRequest {
   Plan plan = 1;
-  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp start = 2;
 }
 
 message ControlResponse {}
@@ -27,27 +27,16 @@ message ControlResponse {}
 // Test Plan
 
 message Plan {
-  repeated RateSegment segments = 1;
-  repeated Action actions = 2;
-}
-
-message RateSegment {
   string name = 1;
-  oneof segment {
-    FixedRateSegment fixed_rate_segment = 2;
-    LinearRateSegment linear_rate_segment = 3;
-  }
+  repeated Segment segments = 2;
+  repeated Action actions = 3;
 }
 
-message FixedRateSegment {
-  float rate = 1;
-  google.protobuf.Duration duration = 2;
-}
-
-message LinearRateSegment {
-  float rate_start = 1;
-  float rate_end = 2;
-  google.protobuf.Duration duration = 3;
+message Segment {
+  string name = 1;
+  float rate_start = 2;
+  float rate_end = 3;
+  google.protobuf.Duration duration = 4;
 }
 
 message Action {

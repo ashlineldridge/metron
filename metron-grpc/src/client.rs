@@ -1,125 +1,95 @@
-use std::{future::Future, pin::Pin, task::Poll};
+use std::{future::Future, pin::Pin, task::Poll, time::Duration};
 
-use metron_core::{Agent, AgentError, Plan, Report};
-use thiserror::Error;
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use anyhow::{Context, Result};
+use metron_core::{Agent, AgentRequest};
+use tokio::sync::{mpsc, oneshot};
 use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 use tower::Service;
+use tracing::info;
 
 use crate::proto;
 
-#[derive(Error, Debug)]
-pub enum AgentClientError {
-    #[error(transparent)]
-    TransportError(#[from] tonic::transport::Error),
-
-    #[error(transparent)]
-    StatusError(#[from] tonic::Status),
-
-    #[error(transparent)]
-    Unexpected(#[from] anyhow::Error),
+struct ControlRequest {
+    inner: proto::ControlRequest,
+    done_tx: oneshot::Sender<()>,
 }
 
-// #[derive(Clone)]
+#[allow(unused)]
 pub struct AgentClient {
-    inner: proto::agent_client::AgentClient<tonic::transport::Channel>,
+    client: proto::agent_client::AgentClient<tonic::transport::Channel>,
+    req_tx: mpsc::Sender<ControlRequest>,
 }
 
 impl AgentClient {
-    pub async fn connect(server_addr: String) -> Result<Self, AgentClientError> {
-        let inner = proto::agent_client::AgentClient::connect(server_addr).await?;
-        Ok(Self { inner })
+    pub async fn connect(server_addr: String) -> Result<Self> {
+        info!(server_addr, "agent client connecting to server");
+
+        let mut client = proto::agent_client::AgentClient::connect(server_addr).await?;
+
+        let (req_tx, req_rx) = mpsc::channel(PROXY_CHAN_SIZE);
+        let req_stream = ReceiverStream::<ControlRequest>::new(req_rx).map(|req| req.inner);
+
+        let res = client.control(req_stream).await?;
+        let mut res_stream = res.into_inner();
+        let (res_tx, mut res_rx) = mpsc::channel(PROXY_CHAN_SIZE);
+
+        let _h1 = tokio::spawn(async move {
+            info!("agent_client: spawned result stream processor");
+            while let Some(res) = res_stream.next().await {
+                info!("agent_client: got result stream response: {:?}", res);
+                let res = res?;
+                // let
+                res_tx.send(res).await?;
+            }
+
+            info!("agent_client: closing result stream processor");
+            Result::<()>::Ok(())
+        });
+
+        let _h2 = tokio::spawn(async move {
+            info!("agent_client: spawned result channel processor");
+            while let Some(res) = res_rx.recv().await {
+                info!("agent_client: got result channel response: {:?}", res);
+            }
+
+            info!("agent_client: closing result channel processor");
+            Result::<()>::Ok(())
+        });
+
+        /*
+        Problem:
+        What is the "result"? The task above is pulling on res_rx but what is it going to do with it?
+        What is the common interface(s) across Agent types?
+        */
+
+        Ok(Self { client, req_tx })
     }
 }
 
 const PROXY_CHAN_SIZE: usize = 1024;
-
-impl AgentClient {
-    pub async fn test(&self, _plan: &Plan) -> Result<(), AgentClientError> {
-        // self.inner.control
-        // let plan = plan.try_into()?;
-        // self.inner
-        //     .clone()
-        //     .test(proto::TestRequest { plan: Some(plan) })
-        //     .await?;
-        Ok(())
-    }
-
-    pub async fn cancel(&self) -> Result<(), AgentClientError> {
-        // self.inner.clone().cancel(proto::CancelRequest {}).await?;
-        Ok(())
-    }
-
-    pub async fn report(&self) -> Result<Report, AgentClientError> {
-        // let res = self
-        //     .inner
-        //     .clone()
-        //     .report(proto::ReportRequest { duration: None })
-        //     .await?;
-
-        // TODO: Convert proto report into domain object.
-        // let _report = res.into_inner();
-
-        Ok(Report {})
-    }
-
-    // TODO: Don't expose the proto from here. Use a domain type.
-    pub async fn control(
-        &self,
-    ) -> Result<
-        (
-            Sender<proto::ControlRequest>,
-            Receiver<proto::ControlResponse>,
-        ),
-        AgentClientError,
-    > {
-        let (req_tx, req_rx) = mpsc::channel(PROXY_CHAN_SIZE);
-        let req_stream = ReceiverStream::new(req_rx);
-
-        let res = self.inner.clone().control(req_stream).await?;
-        let mut res_stream = res.into_inner();
-        let (res_tx, res_rx) = mpsc::channel(PROXY_CHAN_SIZE);
-
-        // TODO: Potentially need (and then don't need mut?):
-        // tokio::pin!(res_stream);
-
-        tokio::spawn(async move {
-            while let Some(res) = res_stream.next().await {
-                // TODO: Error handling? Won't this be silent?
-                let res = res?;
-                res_tx.send(res).await?;
-            }
-            anyhow::Result::<()>::Ok(())
-        });
-
-        Ok((req_tx, res_rx))
-    }
-}
+const SERVER_ACCEPT_TIMEOUT: Duration = Duration::from_secs(1);
 
 impl Agent for AgentClient {
-    async fn test(&self, _plan: &Plan) -> Result<(), AgentError> {
-        // TODO: Create a control connection and send a oneshot plan message.
-        // self.inner.c
-        // self.inner.test(plan).await?;
-        Ok(())
-    }
+    async fn execute(&self, req: AgentRequest) -> Result<()> {
+        let (done_tx, done_rx) = oneshot::channel();
+        let req = ControlRequest {
+            inner: proto::ControlRequest {
+                plan: Some(req.plan.try_into()?),
+                start: Some(req.start.into()),
+            },
+            done_tx,
+        };
 
-    async fn cancel(&self) -> Result<(), AgentError> {
-        // TODO: Create a control connection and send a oneshot empty plan message.
-        // self.cancel().await?;
-        Ok(())
-    }
-}
+        self.req_tx.send(req).await.context("could not send")?;
+        tokio::time::timeout(SERVER_ACCEPT_TIMEOUT, done_rx).await??;
 
-impl From<AgentClientError> for AgentError {
-    fn from(value: AgentClientError) -> Self {
-        AgentError::Unexpected(value.into())
+        Ok(())
     }
 }
 
 impl Service<()> for AgentClient {
     type Response = ();
-    type Error = AgentClientError;
+    type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(

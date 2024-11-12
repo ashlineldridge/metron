@@ -1,9 +1,8 @@
-use std::time::Duration;
-
-use anyhow::Result;
+use anyhow::{Context, Result};
 use metron_config::*;
-use metron_core::{Agent, Proxy, Runner};
+use metron_core::{Agent, AgentRequest, Proxy, Runner};
 use metron_grpc::{AgentClient, AgentServer};
+use quanta::Instant;
 use tower::discover::ServiceList;
 use tracing::info;
 
@@ -13,8 +12,12 @@ pub async fn run_local_test(config: LocalTestConfig) -> Result<()> {
     info!("running local test");
 
     let runner = Runner::run("local".to_owned(), config.sinks);
-    runner.test(&config.plan).await?;
-    tokio::time::sleep(Duration::from_secs(30)).await;
+    runner
+        .execute(AgentRequest {
+            plan: config.plan,
+            start: Instant::now(),
+        })
+        .await?;
 
     Ok(())
 }
@@ -22,9 +25,13 @@ pub async fn run_local_test(config: LocalTestConfig) -> Result<()> {
 pub async fn run_remote_test(config: RemoteTestConfig) -> Result<()> {
     info!("running remote test");
 
-    let discover = agent_discover(&config.agents).await?;
-    let proxy = Proxy::new("local".to_owned(), discover);
-    proxy.test(&config.plan).await?;
+    let agent_client = single_agent_client(&config.agents).await?;
+    agent_client
+        .execute(AgentRequest {
+            plan: config.plan,
+            start: Instant::now(),
+        })
+        .await?;
 
     Ok(())
 }
@@ -44,21 +51,25 @@ pub async fn run_proxy_server(config: ProxyConfig) -> Result<()> {
     info!("running proxy server");
 
     let discover = agent_discover(&config.agents).await?;
-    let proxy = Proxy::new(config.name.unwrap_or("proxy-todo".to_owned()), discover);
+    let proxy = Proxy::new("proxy".to_owned(), discover);
     let port = config.port.unwrap_or(DEFAULT_AGENT_PORT);
-    let _server = AgentServer::new(proxy, port);
-
-    // server.listen().await?;
+    let server = AgentServer::new(proxy, port);
+    server.run().await?;
 
     Ok(())
 }
 
-pub async fn cancel_remote_test(config: CancelConfig) -> Result<()> {
+pub async fn cancel_remote_test(_config: CancelConfig) -> Result<()> {
     info!("cancelling any running test");
 
-    let discover = agent_discover(&config.agents).await?;
-    let proxy = Proxy::new("local".to_owned(), discover);
-    proxy.cancel().await?;
+    // let discover = agent_discover(&config.agents).await?;
+    // let proxy = Proxy::new("local".to_owned(), discover);
+    // proxy
+    //     .execute(AgentRequest {
+    //         plan: Plan::empty(),
+    //         start: Instant::now(),
+    //     })
+    //     .await?;
 
     Ok(())
 }
@@ -74,6 +85,7 @@ pub async fn report_remote_test(_config: ReportConfig) -> Result<()> {
     Ok(())
 }
 
+#[allow(unused)]
 async fn agent_discover(agents: &[RemoteAgentDiscovery]) -> Result<ServiceList<Vec<AgentClient>>> {
     let addrs = agents
         .iter()
@@ -93,4 +105,20 @@ async fn agent_discover(agents: &[RemoteAgentDiscovery]) -> Result<ServiceList<V
     }
 
     Ok(ServiceList::new(agents))
+}
+
+#[allow(unused)]
+async fn single_agent_client(agents: &[RemoteAgentDiscovery]) -> Result<AgentClient> {
+    let addr = agents
+        .first()
+        .and_then(|d| {
+            if let RemoteAgentDiscovery::Static(d) = d {
+                d.endpoints.first()
+            } else {
+                None
+            }
+        })
+        .context("agent server address could not be discovered")?;
+
+    AgentClient::connect(addr.clone()).await
 }
