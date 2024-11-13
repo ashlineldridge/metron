@@ -21,7 +21,7 @@ impl Signal {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 #[allow(unused)]
 enum ControlMessage {
     Plan(Plan),
@@ -63,10 +63,13 @@ fn spawn_executor() -> ExecutorHandle {
     let (sig_tx, mut sig_rx) = mpsc::channel::<Signal>(CHAN_SIZE);
 
     tokio::spawn(async move {
+        info!("executor: spawned");
+
         let current_plan: Arc<RwLock<Plan>> = Arc::new(RwLock::new(Plan::empty()));
         loop {
             tokio::select! {
                 Some(msg) = msg_rx.recv() => {
+                    info!("executor: received control message: {:?}", msg);
                     match msg {
                         ControlMessage::Plan(plan) => {
                             let mut current_plan = current_plan.write().await;
@@ -77,10 +80,17 @@ fn spawn_executor() -> ExecutorHandle {
                         },
                     }
                 },
-                Some(_sig) = sig_rx.recv() => {
+                Some(sig) = sig_rx.recv() => {
+                    info!(signal_delay_micros = Instant::now().duration_since(sig.due).as_micros(),
+                        "executor: received signal");
+
                     let current_plan = current_plan.clone();
                     tokio::task::spawn(async move {
                         let plan = current_plan.read().await;
+
+                        info!(signal_delay_micros = Instant::now().duration_since(sig.due).as_micros(),
+                            "executor: spawned signal processing task");
+
                         for action in &plan.actions {
                             if let Action::Http {
                                 name: _,
