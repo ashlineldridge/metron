@@ -9,19 +9,38 @@ package proto;
 // Agent Service
 
 service Agent {
-  // Create a control stream with the agent.
-  rpc Control(stream ControlRequest) returns (stream ControlResponse);
+  rpc Exec(ExecRequest) returns (ExecResponse);
+  rpc Report(ReportRequest) returns (ReportResponse);
+  rpc Stop(StopRequest) returns (StopResponse);
 }
 
 // ----------------------------------------------------------------------------
 // RPC Requests & Responses
 
-message ControlRequest {
+message ExecRequest {
   Plan plan = 1;
-  google.protobuf.Timestamp start = 2;
 }
 
-message ControlResponse {}
+message ExecResponse {}
+
+message ReportRequest {
+  ReportKind report_kind = 1;
+}
+
+enum ReportKind {
+  DELAY_LATENCY = 0;
+  RESPONSE_LATENCY = 1;
+  ERROR_LATENCY = 2;
+}
+
+
+message ReportResponse {
+  bytes histogram = 1;
+}
+
+message StopRequest {}
+
+message StopResponse {}
 
 // ----------------------------------------------------------------------------
 // Test Plan

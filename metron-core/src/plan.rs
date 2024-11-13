@@ -69,6 +69,11 @@ impl Plan {
             .fold(Duration::from_secs(0), |total, seg| total + seg.duration)
     }
 
+    /// Returns whether the plan is empty.
+    pub fn is_empty(&self) -> bool {
+        return self.calculate_duration().is_zero();
+    }
+
     /// Finds the `PlanSegment` that `progress` falls into.
     ///
     /// If the returned value is `None` then we have completed the plan.

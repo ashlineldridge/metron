@@ -1,211 +1,218 @@
-use anyhow::{Context, Result};
-use quanta::{Clock, Instant};
-use tokio::{sync::mpsc, task::JoinHandle};
-use tracing::{info, warn};
+use std::sync::Arc;
 
-use crate::{Action, Agent, AgentRequest, Plan, Sink};
+use anyhow::Result;
+use hdrhistogram::Histogram;
+use quanta::{Clock, Instant};
+use tokio::sync::{mpsc, RwLock};
+use tracing::info;
+
+use crate::{Action, Agent, Plan, Report, ReportKind, Sink};
 
 const CHAN_SIZE: usize = 1024;
 
 #[derive(Clone, Debug)]
-struct State {
-    plan: Plan,
-    start: Instant,
+pub struct Signal {
+    pub due: Instant,
 }
+
+impl Signal {
+    fn new(due: Instant) -> Self {
+        Self { due }
+    }
+}
+
+#[derive(Clone)]
+#[allow(unused)]
+enum ControlMessage {
+    Plan(Plan),
+    Exit,
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Executor
+/////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone)]
+struct ExecutorHandle {
+    ctl_tx: mpsc::Sender<ControlMessage>,
+    // Use separate channel as signaling is sacred.
+    sig_tx: mpsc::Sender<Signal>,
+}
+
+impl ExecutorHandle {
+    pub fn new(ctl_tx: mpsc::Sender<ControlMessage>, sig_tx: mpsc::Sender<Signal>) -> Self {
+        Self { ctl_tx, sig_tx }
+    }
+
+    #[allow(unused)]
+    async fn signal(&self, sig: Signal) {
+        let _ = self.sig_tx.send(sig).await;
+    }
+
+    fn blocking_signal(&self, sig: Signal) {
+        let _ = self.sig_tx.blocking_send(sig);
+    }
+
+    async fn message(&self, msg: ControlMessage) {
+        let _ = self.ctl_tx.send(msg).await;
+    }
+}
+
+fn spawn_executor() -> ExecutorHandle {
+    let (msg_tx, mut msg_rx) = mpsc::channel::<ControlMessage>(CHAN_SIZE);
+    let (sig_tx, mut sig_rx) = mpsc::channel::<Signal>(CHAN_SIZE);
+
+    tokio::spawn(async move {
+        let current_plan: Arc<RwLock<Plan>> = Arc::new(RwLock::new(Plan::empty()));
+        loop {
+            tokio::select! {
+                Some(msg) = msg_rx.recv() => {
+                    match msg {
+                        ControlMessage::Plan(plan) => {
+                            let mut current_plan = current_plan.write().await;
+                            *current_plan = plan;
+                        },
+                        ControlMessage::Exit => {
+                            break;
+                        },
+                    }
+                },
+                Some(_sig) = sig_rx.recv() => {
+                    let current_plan = current_plan.clone();
+                    tokio::task::spawn(async move {
+                        let plan = current_plan.read().await;
+                        for action in &plan.actions {
+                            if let Action::Http {
+                                name: _,
+                                target,
+                                method,
+                                headers,
+                                payload,
+                            } = action
+                            {
+                                let headers = headers.try_into()?;
+                                let client = reqwest::ClientBuilder::new()
+                                    .default_headers(headers)
+                                    .build()?;
+                                client
+                                    .request(method.into(), target.to_string())
+                                    .body(payload.clone())
+                                    .send()
+                                    .await?;
+                            }
+                        }
+                        anyhow::Result::<()>::Ok(())
+                    });
+                },
+                else => break,
+            };
+        }
+    });
+
+    ExecutorHandle::new(msg_tx, sig_tx)
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Signaller
+/////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone)]
+struct SignallerHandle {
+    ctl_tx: mpsc::Sender<ControlMessage>,
+}
+
+impl SignallerHandle {
+    pub fn new(ctl_tx: mpsc::Sender<ControlMessage>) -> Self {
+        Self { ctl_tx }
+    }
+
+    async fn message(&self, msg: ControlMessage) {
+        let _ = self.ctl_tx.send(msg).await;
+    }
+}
+
+fn spawn_blocking_signaller(clock: Clock, handle: ExecutorHandle) -> SignallerHandle {
+    let (ctl_tx, mut ctl_rx) = mpsc::channel::<ControlMessage>(CHAN_SIZE);
+
+    tokio::task::spawn_blocking(move || {
+        loop {
+            let plan = match ctl_rx.blocking_recv() {
+                None | Some(ControlMessage::Exit) => break,
+                Some(ControlMessage::Plan(plan)) => plan,
+            };
+
+            for tick in plan.ticks(clock.now()) {
+                spin_until(&clock, tick);
+                handle.blocking_signal(Signal::new(tick));
+
+                // If the message receiver is closed or contains a message then break out
+                // of this loop and we'll evaluate the state at the top of the outer loop.
+                if ctl_rx.is_closed() || !ctl_rx.is_empty() {
+                    break;
+                }
+            }
+        }
+        anyhow::Result::<()>::Ok(())
+    });
+
+    SignallerHandle::new(ctl_tx)
+}
+
+fn spin_until(clock: &Clock, t: Instant) {
+    loop {
+        if clock.now() >= t {
+            break;
+        }
+        std::hint::spin_loop();
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Runner
+/////////////////////////////////////////////////////////////////////////////
 
 #[allow(unused)]
 #[derive(Clone)]
 pub struct Runner {
     name: String,
+    signaller: SignallerHandle,
+    executor: ExecutorHandle,
     sinks: Vec<Sink>,
-    state_tx: mpsc::Sender<Option<State>>,
 }
 
 impl Runner {
-    pub fn run(name: String, sinks: Vec<Sink>) -> Self {
-        let clock = Clock::new();
-        let (state_tx, mut state_rx) = mpsc::channel::<Option<State>>(CHAN_SIZE);
-
-        let _h0 = tokio::task::spawn(async move {
-            let mut handles: Option<(JoinHandle<Result<()>>, JoinHandle<Result<()>>)> = None;
-
-            // TODO: Incorporate current state to check if there's actually a diff. This will make it easier
-            // on the proxy to send updates knowing that the agent won't stop/start the signalling unless there's
-            // and actual change.
-            // let mut current_state = None;
-
-            while let Some(state) = state_rx.recv().await {
-                if let Some((_signaller, executor)) = &handles {
-                    executor.abort();
-                    // executor.await;
-                    // signaller.await;
-                }
-
-                if let Some(state) = state {
-                    let (signal_tx, signal_rx) = mpsc::channel(CHAN_SIZE);
-                    let signaller =
-                        Self::spawn_blocking_signaller(clock.clone(), signal_tx, state.clone());
-                    let executor = Self::spawn_executor(signal_rx, state);
-                    handles = Some((signaller, executor));
-                }
-            }
-        });
-
+    pub fn spawn(name: String, clock: Clock, sinks: Vec<Sink>) -> Self {
+        let executor = spawn_executor();
+        let signaller = spawn_blocking_signaller(clock, executor.clone());
         Self {
             name,
+            signaller,
+            executor,
             sinks,
-            state_tx,
         }
     }
 
-    fn spin_until(clock: &Clock, t: Instant) {
-        loop {
-            if clock.now() >= t {
-                break;
-            }
-            std::hint::spin_loop();
-        }
+    async fn update_plan(&self, plan: Plan) {
+        let msg = ControlMessage::Plan(plan);
+        self.executor.message(msg.clone()).await;
+        self.signaller.message(msg).await;
     }
-
-    fn spawn_blocking_signaller(
-        clock: Clock,
-        signal_tx: mpsc::Sender<Signal>,
-        state: State,
-    ) -> JoinHandle<Result<()>> {
-        tokio::task::spawn_blocking(move || {
-            let plan_duration = state.plan.calculate_duration();
-            let stop_at = state.start.checked_add(plan_duration).unwrap();
-
-            for (i, t) in state
-                .plan
-                .ticks(state.start)
-                .filter(|&i| i <= stop_at)
-                .enumerate()
-            {
-                let since_pre_a_micros =
-                    clock.now().checked_duration_since(t).map(|d| d.as_micros());
-                let since_pre_b_micros =
-                    t.checked_duration_since(clock.now()).map(|d| d.as_micros());
-
-                Self::spin_until(&clock, t);
-
-                let since_a_micros = clock.now().checked_duration_since(t).map(|d| d.as_micros());
-                let since_b_micros = t.checked_duration_since(clock.now()).map(|d| d.as_micros());
-
-                if signal_tx.blocking_send(Signal::new(i as u32, t)).is_err() {
-                    break;
-                }
-
-                info!(
-                    id = i,
-                    since_pre_a_micros = since_pre_a_micros,
-                    since_pre_b_micros = since_pre_b_micros,
-                    since_a_micros = since_a_micros,
-                    since_b_micros = since_b_micros,
-                    "signaller: after blocking send",
-                );
-            }
-
-            warn!("signaller: done");
-            Ok(())
-        })
-    }
-
-    fn spawn_executor(
-        mut signal_rx: mpsc::Receiver<Signal>,
-        state: State,
-    ) -> JoinHandle<Result<()>> {
-        // Launch async "executor" task
-        tokio::task::spawn(async move {
-            while let Some(sig) = signal_rx.recv().await {
-                info!(
-                    id = sig.id,
-                    elapsed_micros = sig.due.elapsed().as_micros(),
-                    "executor: received signal and have current state"
-                );
-
-                let actions = state.plan.actions.clone();
-                tokio::task::spawn(async move {
-                    for action in &actions {
-                        if let Action::Http {
-                            name: _,
-                            target,
-                            method,
-                            headers,
-                            payload,
-                        } = action
-                        {
-                            let headers = headers.try_into()?;
-                            let client = reqwest::ClientBuilder::new()
-                                .default_headers(headers)
-                                .build()?;
-                            client
-                                .request(method.into(), target.to_string())
-                                .body(payload.clone())
-                                .send()
-                                .await?;
-                        }
-                    }
-                    Result::<(), anyhow::Error>::Ok(())
-                });
-            }
-
-            // signal_rx must have returned None to indicate that signal_tx has been dropped
-            warn!("executor: done");
-            Ok(())
-        })
-    }
-
-    // async fn wait(&self) {
-    //     self.
-    // }
 }
 
 impl Agent for Runner {
-    async fn execute(&self, req: AgentRequest) -> Result<()> {
-        info!("runner: sending test state to agent");
-        let AgentRequest { plan, start } = req;
-        self.state_tx
-            .send(Some(State { plan, start }))
-            .await
-            .context("could not send state")?;
-
+    async fn exec(&self, plan: Plan) -> Result<()> {
+        self.update_plan(plan).await;
         Ok(())
     }
-}
 
-#[derive(Clone, Debug)]
-pub struct Signal {
-    pub id: u32,
-    pub due: Instant,
-}
+    async fn stop(&self) -> Result<()> {
+        self.update_plan(Plan::empty()).await;
+        Ok(())
+    }
 
-impl Signal {
-    fn new(id: u32, due: Instant) -> Self {
-        Self { id, due }
+    async fn report(&self, _kind: ReportKind) -> Result<Report> {
+        Ok(Report {
+            data: Histogram::new(4)?,
+        })
     }
 }
-
-// #[derive(Debug)]
-// pub struct Sample {
-//     pub target: Url,
-//     pub due: Instant,
-//     pub sent: Instant,
-//     pub done: Instant,
-//     pub status: Result<u16, anyhow::Error>,
-// }
-
-// impl Sample {
-//     pub fn actual_latency(&self) -> Duration {
-//         self.done - self.sent
-//     }
-
-//     pub fn corrected_latency(&self) -> Duration {
-//         self.done - self.due
-//     }
-
-//     // TODO: What is this?
-//     pub fn client_latency(&self) -> Duration {
-//         self.sent - self.due
-//     }
-// }

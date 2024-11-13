@@ -1,15 +1,24 @@
 use std::future::Future;
 
-use quanta::Instant;
+use anyhow::Result;
 
 use crate::Plan;
 
-#[derive(Clone, Debug)]
-pub struct AgentRequest {
-    pub plan: Plan,
-    pub start: Instant,
+// #[allow(async_fn_in_trait)]
+pub trait Agent {
+    fn exec(&self, plan: Plan) -> impl Future<Output = Result<()>> + Send;
+    fn stop(&self) -> impl Future<Output = Result<()>> + Send;
+    fn report(&self, kind: ReportKind) -> impl Future<Output = Result<Report>> + Send;
 }
 
-pub trait Agent {
-    fn execute(&self, req: AgentRequest) -> impl Future<Output = Result<(), anyhow::Error>> + Send;
+#[derive(Clone, Debug)]
+pub enum ReportKind {
+    DelayLatency,
+    ResponseLatency,
+    ErrorLatency,
+}
+
+#[derive(Clone, Debug)]
+pub struct Report {
+    pub data: hdrhistogram::Histogram<u64>,
 }

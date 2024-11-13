@@ -4,53 +4,102 @@ pub(crate) mod proto {
     tonic::include_proto!("proto");
 }
 
+use std::io::Cursor;
+
 use anyhow::Context;
 pub use client::*;
-use metron_core::{Action, AgentRequest, HttpMethod, Plan, Segment};
+use hdrhistogram::serialization::{Deserializer, Serializer, V2Serializer};
+use metron_core::{Action, HttpMethod, Plan, Report, ReportKind, Segment};
 pub use server::*;
 
 // ----------------------------------------------------------------------------
-// Agent Request
+// RPC Requests & Responses
 
-impl TryFrom<AgentRequest> for proto::ControlRequest {
+// ----------------------------------------------------------------------------
+// Report
+
+impl TryFrom<Report> for proto::ReportResponse {
     type Error = anyhow::Error;
 
-    fn try_from(value: AgentRequest) -> Result<Self, Self::Error> {
+    fn try_from(value: Report) -> Result<Self, Self::Error> {
         TryFrom::try_from(&value)
     }
 }
 
-impl TryFrom<&AgentRequest> for proto::ControlRequest {
+impl TryFrom<&Report> for proto::ReportResponse {
     type Error = anyhow::Error;
 
-    fn try_from(value: &AgentRequest) -> Result<Self, Self::Error> {
-        Ok(Self {
-            plan: Some(TryInto::try_into(&value.plan)?),
-            start: Some(value.start.into()),
-        })
+    fn try_from(value: &Report) -> Result<Self, Self::Error> {
+        let mut vec = vec![];
+        V2Serializer::new().serialize(&value.data, &mut vec)?;
+        Ok(proto::ReportResponse { histogram: vec })
     }
 }
 
-impl TryFrom<proto::ControlRequest> for AgentRequest {
+impl TryFrom<proto::ReportResponse> for Report {
     type Error = anyhow::Error;
 
-    fn try_from(value: proto::ControlRequest) -> Result<Self, Self::Error> {
+    fn try_from(value: proto::ReportResponse) -> Result<Self, Self::Error> {
         TryFrom::try_from(&value)
     }
 }
 
-impl TryFrom<&proto::ControlRequest> for AgentRequest {
+impl TryFrom<&proto::ReportResponse> for Report {
     type Error = anyhow::Error;
 
-    fn try_from(value: &proto::ControlRequest) -> Result<Self, Self::Error> {
-        let plan = value.plan.as_ref().context("missing plan")?.try_into()?;
-        let start = value.start.context("missing plan start time")?.into();
-        Ok(Self { plan, start })
+    fn try_from(value: &proto::ReportResponse) -> Result<Self, Self::Error> {
+        let mut cursor = Cursor::new(&value.histogram);
+        let histogram = Deserializer::new().deserialize(&mut cursor)?;
+        Ok(Report { data: histogram })
+    }
+}
+
+impl TryFrom<ReportKind> for proto::ReportKind {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ReportKind) -> Result<Self, Self::Error> {
+        TryFrom::try_from(&value)
+    }
+}
+
+impl TryFrom<&ReportKind> for proto::ReportKind {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &ReportKind) -> Result<Self, Self::Error> {
+        let kind = match value.clone() {
+            ReportKind::DelayLatency => proto::ReportKind::DelayLatency,
+            ReportKind::ResponseLatency => proto::ReportKind::ResponseLatency,
+            ReportKind::ErrorLatency => proto::ReportKind::ErrorLatency,
+        };
+
+        Ok(kind)
+    }
+}
+
+impl TryFrom<proto::ReportKind> for ReportKind {
+    type Error = anyhow::Error;
+
+    fn try_from(value: proto::ReportKind) -> Result<Self, Self::Error> {
+        TryFrom::try_from(&value)
+    }
+}
+
+impl TryFrom<&proto::ReportKind> for ReportKind {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &proto::ReportKind) -> Result<Self, Self::Error> {
+        let kind = match value.clone() {
+            proto::ReportKind::DelayLatency => ReportKind::DelayLatency,
+            proto::ReportKind::ResponseLatency => ReportKind::ResponseLatency,
+            proto::ReportKind::ErrorLatency => ReportKind::ErrorLatency,
+        };
+
+        Ok(kind)
     }
 }
 
 // ----------------------------------------------------------------------------
-// Test Plan
+// Plan
 
 impl TryFrom<Plan> for proto::Plan {
     type Error = anyhow::Error;

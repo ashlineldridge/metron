@@ -1,7 +1,7 @@
 use anyhow::Result;
 use tower::discover::Discover;
 
-use crate::{Agent, AgentRequest};
+use crate::{Agent, Plan, Report, ReportKind};
 
 #[allow(unused)]
 #[derive(Clone)]
@@ -29,12 +29,19 @@ where
 
 impl<D> Agent for Proxy<D>
 where
-    // A: Agent + Send + Sync + 'static,
     D: Discover + Send + Sync + 'static,
     D::Service: Agent + Send + Sync + 'static,
 {
-    async fn execute(&self, _req: AgentRequest) -> Result<()> {
-        Ok(())
+    async fn exec(&self, _plan: Plan) -> Result<()> {
+        todo!()
+    }
+
+    async fn report(&self, _kind: ReportKind) -> Result<Report> {
+        todo!()
+    }
+
+    async fn stop(&self) -> Result<()> {
+        todo!()
     }
 }
 

@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use metron_config::*;
-use metron_core::{Agent, AgentRequest, Proxy, Runner};
+use metron_core::{Agent, Proxy, Runner};
 use metron_grpc::{AgentClient, AgentServer};
-use quanta::Instant;
+use quanta::Clock;
 use tower::discover::ServiceList;
 use tracing::info;
 
@@ -11,13 +11,10 @@ const DEFAULT_AGENT_PORT: u16 = 9090;
 pub async fn run_local_test(config: LocalTestConfig) -> Result<()> {
     info!("running local test");
 
-    let runner = Runner::run("local".to_owned(), config.sinks);
-    runner
-        .execute(AgentRequest {
-            plan: config.plan,
-            start: Instant::now(),
-        })
-        .await?;
+    let runner = Runner::spawn("local".to_owned(), Clock::new(), config.sinks);
+    runner.exec(config.plan).await?;
+    // TODO: Still need to sleep here... What can I "hang" on?
+    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 
     Ok(())
 }
@@ -25,13 +22,8 @@ pub async fn run_local_test(config: LocalTestConfig) -> Result<()> {
 pub async fn run_remote_test(config: RemoteTestConfig) -> Result<()> {
     info!("running remote test");
 
-    let agent_client = single_agent_client(&config.agents).await?;
-    agent_client
-        .execute(AgentRequest {
-            plan: config.plan,
-            start: Instant::now(),
-        })
-        .await?;
+    let client = single_agent_client(&config.agents).await?;
+    client.exec(config.plan).await?;
 
     Ok(())
 }
@@ -39,7 +31,12 @@ pub async fn run_remote_test(config: RemoteTestConfig) -> Result<()> {
 pub async fn run_agent_server(config: AgentConfig) -> Result<()> {
     info!("running agent server");
 
-    let runner = Runner::run("agent".to_owned(), config.sinks);
+    // Because here, the server doesn't need to wait, right?
+    // Can I use the report "stream"? Perhaps the exec function is async non-blocking
+    // but the runner exposes a wait function or is a Future for the local use case
+    // which is the only use case, right? Could still marry up with the report stream
+    // potentially.
+    let runner = Runner::spawn("local".to_owned(), Clock::new(), config.sinks);
     let port = config.port.unwrap_or(DEFAULT_AGENT_PORT);
     let server = AgentServer::new(runner, port);
     server.run().await?;

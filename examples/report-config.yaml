@@ -2,4 +2,4 @@ agents:
 - type: static
   spec:
     endpoints:
-    - 127.0.0.1:8989
+    - http://[::1]:8989

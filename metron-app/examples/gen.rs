@@ -13,7 +13,7 @@ use serde::ser;
 /// Generate example config files and save them under the top-level examples directory.
 fn main() -> Result<()> {
     let remote_agents = vec![RemoteAgentDiscovery::Static(StaticAgentDiscovery {
-        endpoints: vec!["127.0.0.1:8989".to_owned()],
+        endpoints: vec!["http://[::1]:8989".to_owned()],
     })];
     let sinks = vec![Sink::Otel(OtelSink {
         address: url::Url::parse("http://localhost:8989")?,
