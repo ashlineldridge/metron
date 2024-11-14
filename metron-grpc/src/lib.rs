@@ -66,7 +66,7 @@ impl TryFrom<&ReportKind> for proto::ReportKind {
     type Error = anyhow::Error;
 
     fn try_from(value: &ReportKind) -> Result<Self, Self::Error> {
-        let kind = match value.clone() {
+        let kind = match value {
             ReportKind::DelayLatency => proto::ReportKind::DelayLatency,
             ReportKind::ResponseLatency => proto::ReportKind::ResponseLatency,
             ReportKind::ErrorLatency => proto::ReportKind::ErrorLatency,
@@ -88,7 +88,7 @@ impl TryFrom<&proto::ReportKind> for ReportKind {
     type Error = anyhow::Error;
 
     fn try_from(value: &proto::ReportKind) -> Result<Self, Self::Error> {
-        let kind = match value.clone() {
+        let kind = match value {
             proto::ReportKind::DelayLatency => ReportKind::DelayLatency,
             proto::ReportKind::ResponseLatency => ReportKind::ResponseLatency,
             proto::ReportKind::ErrorLatency => ReportKind::ErrorLatency,

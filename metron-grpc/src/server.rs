@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use metron_core::Agent;
+use metron_core::{Agent, ReportKind};
 use tonic::{Request, Response, Status};
 use tracing::info;
 
@@ -66,48 +66,21 @@ where
         &self,
         _request: Request<proto::ReportRequest>,
     ) -> std::result::Result<Response<proto::ReportResponse>, Status> {
-        todo!()
+        self.agent
+            .report(ReportKind::DelayLatency)
+            .await
+            .map_err(|e| Status::internal(format!("internal error: {}", e)))?;
+        Ok(Response::new(proto::ReportResponse { histogram: vec![] }))
     }
 
     async fn stop(
         &self,
         _request: Request<proto::StopRequest>,
     ) -> std::result::Result<Response<proto::StopResponse>, Status> {
-        todo!()
+        self.agent
+            .stop()
+            .await
+            .map_err(|e| Status::internal(format!("internal error: {}", e)))?;
+        Ok(Response::new(proto::StopResponse {}))
     }
-
-    // async fn control(
-    //     &self,
-    //     request: Request<Streaming<proto::ControlRequest>>,
-    // ) -> Result<Response<Self::ControlStream>, Status> {
-    //     info!("agent_server: received control stream RPC");
-
-    //     // Acquire permit to ensure that the server is controlled by a single client.
-    //     let permit = self
-    //         .lock
-    //         .clone()
-    //         .try_acquire_owned()
-    //         .map_err(|_| Status::failed_precondition("control stream in progress"))?;
-
-    //     let agent = self.agent.clone();
-    //     let mut stream = request.into_inner();
-    //     let output = async_stream::try_stream! {
-    //         info!("agent_server: building stream: {:?}", permit);
-    //         while let Some(req) = stream.next().await {
-    //             info!("agent_server: received control message via stream");
-    //             let req = req?;
-    //             let req = req.try_into().map_err(|e| Status::invalid_argument(format!("invalid control request: {}", e)))?;
-    //             agent.execute(req).await.map_err(|e| Status::internal(format!("agent server error: {}", e)))?;
-    //             yield proto::ControlResponse { };
-    //         }
-
-    //         info!("agent_server: control stream is closing");
-
-    //         // Drop the permit so that a subsequent control RPC can be executed.
-    //         drop(permit);
-    //     };
-
-    //     info!("agent_server: returning control stream");
-    //     Ok(Response::new(Box::pin(output) as Self::ControlStream))
-    // }
 }

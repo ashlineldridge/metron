@@ -56,17 +56,11 @@ pub async fn run_proxy_server(config: ProxyConfig) -> Result<()> {
     Ok(())
 }
 
-pub async fn cancel_remote_test(_config: CancelConfig) -> Result<()> {
-    info!("cancelling any running test");
+pub async fn stop_remote_test(config: StopConfig) -> Result<()> {
+    info!("stopping any running test");
 
-    // let discover = agent_discover(&config.agents).await?;
-    // let proxy = Proxy::new("local".to_owned(), discover);
-    // proxy
-    //     .execute(AgentRequest {
-    //         plan: Plan::empty(),
-    //         start: Instant::now(),
-    //     })
-    //     .await?;
+    let client = single_agent_client(&config.agents).await?;
+    client.stop().await?;
 
     Ok(())
 }

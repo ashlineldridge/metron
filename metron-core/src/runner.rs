@@ -41,11 +41,6 @@ impl Executor {
         tokio::spawn(async move {
             info!("executor: spawned");
             while let Some(sig) = rx.recv().await {
-                info!(
-                    signal_delay_micros = Instant::now().duration_since(sig.due).as_micros(),
-                    "executor: received signal"
-                );
-
                 let plan = plan.clone();
                 tokio::task::spawn(async move {
                     info!(
@@ -198,11 +193,13 @@ impl Runner {
 
 impl Agent for Runner {
     async fn exec(&self, plan: Plan) -> Result<()> {
+        info!("runner: exec called");
         self.run(plan)?;
         Ok(())
     }
 
     async fn stop(&self) -> Result<()> {
+        info!("runner: stop called");
         let handle = {
             let mut guard = self.running.lock().unwrap();
             guard.take()
@@ -218,6 +215,7 @@ impl Agent for Runner {
     }
 
     async fn report(&self, _kind: ReportKind) -> Result<Report> {
+        info!("runner: report called");
         Ok(Report {
             data: Histogram::new(4)?,
         })

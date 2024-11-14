@@ -30,7 +30,7 @@ pub struct AgentConfig {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct CancelConfig {
+pub struct StopConfig {
     pub agents: Vec<RemoteAgentDiscovery>,
 }
 

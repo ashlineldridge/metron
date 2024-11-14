@@ -62,10 +62,10 @@ fn main() -> Result<()> {
         }),
         sinks: sinks.clone(),
     };
-    let cancel_config = CancelConfig {
+    let stop_config = StopConfig {
         agents: remote_agents.clone(),
     };
-    let report_config = CancelConfig {
+    let report_config = StopConfig {
         agents: remote_agents.clone(),
     };
     let proxy_config = ProxyConfig {
@@ -81,7 +81,7 @@ fn main() -> Result<()> {
     save_config(&local_test_config, path.join("local-test-config.yaml"))?;
     save_config(&remote_test_config, path.join("remote-test-config.yaml"))?;
     save_config(&agent_config, path.join("agent-config.yaml"))?;
-    save_config(&cancel_config, path.join("cancel-config.yaml"))?;
+    save_config(&stop_config, path.join("stop-config.yaml"))?;
     save_config(&report_config, path.join("report-config.yaml"))?;
     save_config(&proxy_config, path.join("proxy-config.yaml"))?;
 

@@ -4,7 +4,6 @@ use anyhow::Result;
 
 use crate::Plan;
 
-// #[allow(async_fn_in_trait)]
 pub trait Agent {
     fn exec(&self, plan: Plan) -> impl Future<Output = Result<()>> + Send;
     fn stop(&self) -> impl Future<Output = Result<()>> + Send;

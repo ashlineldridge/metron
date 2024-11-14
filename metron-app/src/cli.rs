@@ -38,11 +38,11 @@ pub enum AgentCommand {
         #[arg(short = 'f', long = "file", value_parser = config_file::<RemoteTestConfig>, value_name = "FILE")]
         config: RemoteTestConfig,
     },
-    /// Cancel a remote load test
-    Cancel {
+    /// Stop a remote load test
+    Stop {
         /// Stop config file (use '-' for stdin)
-        #[arg(short = 'f', long = "file", value_parser = config_file::<CancelConfig>, value_name = "FILE")]
-        config: CancelConfig,
+        #[arg(short = 'f', long = "file", value_parser = config_file::<StopConfig>, value_name = "FILE")]
+        config: StopConfig,
     },
     /// Print a test report
     Report {

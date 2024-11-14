@@ -27,7 +27,7 @@ fn main() -> Result<()> {
             Command::Agent { command } => match command {
                 AgentCommand::Run { config } => app::run_agent_server(config).await,
                 AgentCommand::Test { config } => app::run_remote_test(config).await,
-                AgentCommand::Cancel { config } => app::cancel_remote_test(config).await,
+                AgentCommand::Stop { config } => app::stop_remote_test(config).await,
                 AgentCommand::Report { config } => app::report_remote_test(config).await,
                 AgentCommand::Proxy { config } => app::run_proxy_server(config).await,
             },
