@@ -1,9 +1,9 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use hdrhistogram::Histogram;
 use quanta::{Clock, Instant};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{mpsc, oneshot, Notify};
 use tracing::info;
 
 use crate::{Action, Agent, Plan, Report, ReportKind, Sink};
@@ -33,93 +33,56 @@ enum ControlMessage {
 /////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone)]
-struct ExecutorHandle {
-    ctl_tx: mpsc::Sender<ControlMessage>,
-    // Use separate channel as signaling is sacred.
-    sig_tx: mpsc::Sender<Signal>,
-}
+struct Executor(mpsc::Sender<Signal>);
 
-impl ExecutorHandle {
-    pub fn new(ctl_tx: mpsc::Sender<ControlMessage>, sig_tx: mpsc::Sender<Signal>) -> Self {
-        Self { ctl_tx, sig_tx }
-    }
+impl Executor {
+    fn spawn(plan: Arc<Plan>) -> Executor {
+        let (tx, mut rx) = mpsc::channel::<Signal>(CHAN_SIZE);
+        tokio::spawn(async move {
+            info!("executor: spawned");
+            while let Some(sig) = rx.recv().await {
+                info!(
+                    signal_delay_micros = Instant::now().duration_since(sig.due).as_micros(),
+                    "executor: received signal"
+                );
 
-    #[allow(unused)]
-    async fn signal(&self, sig: Signal) {
-        let _ = self.sig_tx.send(sig).await;
-    }
+                let plan = plan.clone();
+                tokio::task::spawn(async move {
+                    info!(
+                        signal_delay_micros = Instant::now().duration_since(sig.due).as_micros(),
+                        "executor: spawned signal processing task"
+                    );
 
-    fn blocking_signal(&self, sig: Signal) {
-        let _ = self.sig_tx.blocking_send(sig);
-    }
-
-    async fn message(&self, msg: ControlMessage) {
-        let _ = self.ctl_tx.send(msg).await;
-    }
-}
-
-fn spawn_executor() -> ExecutorHandle {
-    let (msg_tx, mut msg_rx) = mpsc::channel::<ControlMessage>(CHAN_SIZE);
-    let (sig_tx, mut sig_rx) = mpsc::channel::<Signal>(CHAN_SIZE);
-
-    tokio::spawn(async move {
-        info!("executor: spawned");
-
-        let current_plan: Arc<RwLock<Plan>> = Arc::new(RwLock::new(Plan::empty()));
-        loop {
-            tokio::select! {
-                Some(msg) = msg_rx.recv() => {
-                    info!("executor: received control message: {:?}", msg);
-                    match msg {
-                        ControlMessage::Plan(plan) => {
-                            let mut current_plan = current_plan.write().await;
-                            *current_plan = plan;
-                        },
-                        ControlMessage::Exit => {
-                            break;
-                        },
-                    }
-                },
-                Some(sig) = sig_rx.recv() => {
-                    info!(signal_delay_micros = Instant::now().duration_since(sig.due).as_micros(),
-                        "executor: received signal");
-
-                    let current_plan = current_plan.clone();
-                    tokio::task::spawn(async move {
-                        let plan = current_plan.read().await;
-
-                        info!(signal_delay_micros = Instant::now().duration_since(sig.due).as_micros(),
-                            "executor: spawned signal processing task");
-
-                        for action in &plan.actions {
-                            if let Action::Http {
-                                name: _,
-                                target,
-                                method,
-                                headers,
-                                payload,
-                            } = action
-                            {
-                                let headers = headers.try_into()?;
-                                let client = reqwest::ClientBuilder::new()
-                                    .default_headers(headers)
-                                    .build()?;
-                                client
-                                    .request(method.into(), target.to_string())
-                                    .body(payload.clone())
-                                    .send()
-                                    .await?;
-                            }
+                    for action in &plan.actions {
+                        if let Action::Http {
+                            name: _,
+                            target,
+                            method,
+                            headers,
+                            payload,
+                        } = action
+                        {
+                            let headers = headers.try_into()?;
+                            let client = reqwest::ClientBuilder::new()
+                                .default_headers(headers)
+                                .build()?;
+                            client
+                                .request(method.into(), target.to_string())
+                                .body(payload.clone())
+                                .send()
+                                .await?;
                         }
-                        anyhow::Result::<()>::Ok(())
-                    });
-                },
-                else => break,
-            };
-        }
-    });
+                    }
+                    anyhow::Result::<()>::Ok(())
+                });
+            }
 
-    ExecutorHandle::new(msg_tx, sig_tx)
+            info!("executor: done");
+            anyhow::Result::<()>::Ok(())
+        });
+
+        Executor(tx)
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -127,45 +90,43 @@ fn spawn_executor() -> ExecutorHandle {
 /////////////////////////////////////////////////////////////////////////////
 
 #[derive(Clone)]
-struct SignallerHandle {
-    ctl_tx: mpsc::Sender<ControlMessage>,
-}
+struct Signaller(Arc<Notify>);
 
-impl SignallerHandle {
-    pub fn new(ctl_tx: mpsc::Sender<ControlMessage>) -> Self {
-        Self { ctl_tx }
-    }
+impl Signaller {
+    fn spawn(
+        plan: Arc<Plan>,
+        clock: Clock,
+        executor: Executor,
+        mut cancel: oneshot::Receiver<()>,
+    ) -> Signaller {
+        let done = Arc::new(Notify::new());
+        let signaller = Self(done.clone());
 
-    async fn message(&self, msg: ControlMessage) {
-        let _ = self.ctl_tx.send(msg).await;
-    }
-}
-
-fn spawn_blocking_signaller(clock: Clock, handle: ExecutorHandle) -> SignallerHandle {
-    let (ctl_tx, mut ctl_rx) = mpsc::channel::<ControlMessage>(CHAN_SIZE);
-
-    tokio::task::spawn_blocking(move || {
-        loop {
-            let plan = match ctl_rx.blocking_recv() {
-                None | Some(ControlMessage::Exit) => break,
-                Some(ControlMessage::Plan(plan)) => plan,
-            };
-
+        tokio::task::spawn_blocking(move || {
             for tick in plan.ticks(clock.now()) {
-                spin_until(&clock, tick);
-                handle.blocking_signal(Signal::new(tick));
+                if cancel.try_recv().is_ok() {
+                    info!("signaller: cancelling");
+                    break;
+                }
 
-                // If the message receiver is closed or contains a message then break out
-                // of this loop and we'll evaluate the state at the top of the outer loop.
-                if ctl_rx.is_closed() || !ctl_rx.is_empty() {
+                spin_until(&clock, tick);
+                if executor.0.blocking_send(Signal::new(tick)).is_err() {
+                    info!("signaller: couldn't signal executor - exiting");
                     break;
                 }
             }
-        }
-        anyhow::Result::<()>::Ok(())
-    });
 
-    SignallerHandle::new(ctl_tx)
+            info!("signaller: done");
+            done.notify_waiters();
+            anyhow::Result::<()>::Ok(())
+        });
+
+        signaller
+    }
+
+    async fn done(&self) {
+        self.0.notified().await;
+    }
 }
 
 fn spin_until(clock: &Clock, t: Instant) {
@@ -181,42 +142,78 @@ fn spin_until(clock: &Clock, t: Instant) {
 // Runner
 /////////////////////////////////////////////////////////////////////////////
 
+struct Handle {
+    signaller: Signaller,
+    cancel: oneshot::Sender<()>,
+}
+
+impl Handle {
+    fn new(signaller: Signaller, cancel: oneshot::Sender<()>) -> Self {
+        Self { signaller, cancel }
+    }
+}
+
 #[allow(unused)]
 #[derive(Clone)]
 pub struct Runner {
     name: String,
-    signaller: SignallerHandle,
-    executor: ExecutorHandle,
+    clock: Clock,
     sinks: Vec<Sink>,
+    running: Arc<Mutex<Option<Handle>>>,
 }
 
 impl Runner {
-    pub fn spawn(name: String, clock: Clock, sinks: Vec<Sink>) -> Self {
-        let executor = spawn_executor();
-        let signaller = spawn_blocking_signaller(clock, executor.clone());
+    pub fn new(name: String, clock: Clock, sinks: Vec<Sink>) -> Self {
         Self {
             name,
-            signaller,
-            executor,
+            clock,
             sinks,
+            running: Arc::new(Mutex::new(None)),
         }
     }
 
-    async fn update_plan(&self, plan: Plan) {
-        let msg = ControlMessage::Plan(plan);
-        self.executor.message(msg.clone()).await;
-        self.signaller.message(msg).await;
+    fn run(&self, plan: Plan) -> Result<Signaller> {
+        let mut guard = self.running.lock().unwrap();
+        if let Some(handle) = guard.take() {
+            let _ = handle.cancel.send(());
+        }
+
+        let plan = Arc::new(plan);
+        let executor = Executor::spawn(plan.clone());
+        let (cancel_tx, cancel_rx) = oneshot::channel();
+        let signaller = Signaller::spawn(plan, self.clock.clone(), executor, cancel_rx);
+        let handle = Handle::new(signaller.clone(), cancel_tx);
+
+        *guard = Some(handle);
+
+        Ok(signaller)
+    }
+
+    pub async fn run_wait(&self, plan: Plan) -> Result<()> {
+        let signaller = self.run(plan)?;
+        signaller.done().await;
+        Ok(())
     }
 }
 
 impl Agent for Runner {
     async fn exec(&self, plan: Plan) -> Result<()> {
-        self.update_plan(plan).await;
+        self.run(plan)?;
         Ok(())
     }
 
     async fn stop(&self) -> Result<()> {
-        self.update_plan(Plan::empty()).await;
+        let handle = {
+            let mut guard = self.running.lock().unwrap();
+            guard.take()
+        };
+
+        if let Some(handle) = handle {
+            if handle.cancel.send(()).is_ok() {
+                handle.signaller.done().await;
+            }
+        }
+
         Ok(())
     }
 

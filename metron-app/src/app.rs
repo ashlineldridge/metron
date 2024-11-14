@@ -11,10 +11,10 @@ const DEFAULT_AGENT_PORT: u16 = 9090;
 pub async fn run_local_test(config: LocalTestConfig) -> Result<()> {
     info!("running local test");
 
-    let runner = Runner::spawn("local".to_owned(), Clock::new(), config.sinks);
-    runner.exec(config.plan).await?;
+    let runner = Runner::new("local".to_owned(), Clock::new(), config.sinks);
+    runner.run_wait(config.plan).await?;
     // TODO: Still need to sleep here... What can I "hang" on?
-    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+    // tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 
     Ok(())
 }
@@ -36,7 +36,7 @@ pub async fn run_agent_server(config: AgentConfig) -> Result<()> {
     // but the runner exposes a wait function or is a Future for the local use case
     // which is the only use case, right? Could still marry up with the report stream
     // potentially.
-    let runner = Runner::spawn("local".to_owned(), Clock::new(), config.sinks);
+    let runner = Runner::new("local".to_owned(), Clock::new(), config.sinks);
     let port = config.port.unwrap_or(DEFAULT_AGENT_PORT);
     let server = AgentServer::new(runner, port);
     server.run().await?;
